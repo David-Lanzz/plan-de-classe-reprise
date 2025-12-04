@@ -2,11 +2,8 @@ import { createBrowserClient } from "@supabase/ssr"
 
 let client: ReturnType<typeof createBrowserClient> | null = null
 
-/**
- * Crée un client Supabase pour le navigateur (singleton)
- * Évite de créer plusieurs instances du client
- */
 export function createClient() {
+  // Singleton pattern pour éviter de créer plusieurs instances
   if (client) return client
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

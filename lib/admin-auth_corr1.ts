@@ -11,10 +11,6 @@ export interface AdminCredentials {
   displayName: string
 }
 
-// Constantes centralisées
-const ADMIN_SESSION_KEY = "admin_session"
-const COOKIE_MAX_AGE_DAYS = 7
-
 // Codes admin hardcodés dans le code source
 const ADMIN_CODES: Record<string, AdminCredentials> = {
   cpdc001: {
@@ -40,26 +36,30 @@ const ADMIN_CODES: Record<string, AdminCredentials> = {
   },
 }
 
-/**
- * Valide un code admin et retourne les credentials associés
- */
+const ADMIN_SESSION_KEY = "admin_session"
+const COOKIE_MAX_AGE_DAYS = 7
+
 export function validateAdminCode(code: string): AdminCredentials | null {
   const normalizedCode = code.toLowerCase().trim()
-  return ADMIN_CODES[normalizedCode] || null
+  console.log("[AdminAuth] Validating code:", normalizedCode)
+  
+  const adminCreds = ADMIN_CODES[normalizedCode]
+  
+  if (adminCreds) {
+    console.log("[AdminAuth] Valid admin code found")
+  } else {
+    console.log("[AdminAuth] Invalid admin code")
+  }
+  
+  return adminCreds || null
 }
 
-/**
- * Vérifie si une session admin est active
- */
 export function isAdminSession(): boolean {
   if (typeof window === "undefined") return false
   const session = getCookieValue(ADMIN_SESSION_KEY)
   return !!session
 }
 
-/**
- * Récupère la session admin courante
- */
 export function getAdminSession(): AdminCredentials | null {
   if (typeof window === "undefined") return null
   
@@ -69,34 +69,34 @@ export function getAdminSession(): AdminCredentials | null {
   try {
     return JSON.parse(decodeURIComponent(session))
   } catch {
+    console.error("[AdminAuth] Error parsing admin session")
     return null
   }
 }
 
-/**
- * Enregistre une session admin dans un cookie
- */
 export function setAdminSession(credentials: AdminCredentials): void {
-  if (typeof document === "undefined") return
+  if (typeof window === "undefined") {
+    console.log("[AdminAuth] Cannot set session on server side")
+    return
+  }
   
   const value = encodeURIComponent(JSON.stringify(credentials))
   const maxAge = COOKIE_MAX_AGE_DAYS * 24 * 60 * 60
   
   document.cookie = `${ADMIN_SESSION_KEY}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`
+  
+  console.log("[AdminAuth] Admin session stored for:", credentials.displayName)
 }
 
-/**
- * Supprime la session admin
- */
 export function clearAdminSession(): void {
-  if (typeof document === "undefined") return
+  if (typeof window === "undefined") return
   
   document.cookie = `${ADMIN_SESSION_KEY}=; path=/; max-age=0`
+  
+  console.log("[AdminAuth] Admin session cleared")
 }
 
-/**
- * Helper pour lire un cookie par son nom
- */
+// Helper pour lire un cookie
 function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") return null
   const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))

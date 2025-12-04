@@ -1,7 +1,4 @@
-/**
- * Authentification Admin
- * Ces codes permettent l'accès même si Supabase est hors ligne
- */
+// Ces codes permettent l'accès même si Supabase est hors ligne
 
 export interface AdminCredentials {
   code: string
@@ -10,10 +7,6 @@ export interface AdminCredentials {
   username: string
   displayName: string
 }
-
-// Constantes centralisées
-const ADMIN_SESSION_KEY = "admin_session"
-const COOKIE_MAX_AGE_DAYS = 7
 
 // Codes admin hardcodés dans le code source
 const ADMIN_CODES: Record<string, AdminCredentials> = {
@@ -40,32 +33,46 @@ const ADMIN_CODES: Record<string, AdminCredentials> = {
   },
 }
 
-/**
- * Valide un code admin et retourne les credentials associés
- */
 export function validateAdminCode(code: string): AdminCredentials | null {
   const normalizedCode = code.toLowerCase().trim()
-  return ADMIN_CODES[normalizedCode] || null
+  const adminCreds = ADMIN_CODES[normalizedCode]
+  return adminCreds || null
 }
 
-/**
- * Vérifie si une session admin est active
- */
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const expires = new Date()
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+}
+
+function getCookie(name: string): string | null {
+  if (typeof window === "undefined") return null
+  const nameEQ = name + "="
+  const ca = document.cookie.split(";")
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i]
+    while (c.charAt(0) === " ") c = c.substring(1, c.length)
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length)
+  }
+  return null
+}
+
+function deleteCookie(name: string) {
+  if (typeof document === "undefined") return
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`
+}
+
 export function isAdminSession(): boolean {
   if (typeof window === "undefined") return false
-  const session = getCookieValue(ADMIN_SESSION_KEY)
+  const session = getCookie("admin_session")
   return !!session
 }
 
-/**
- * Récupère la session admin courante
- */
 export function getAdminSession(): AdminCredentials | null {
   if (typeof window === "undefined") return null
-  
-  const session = getCookieValue(ADMIN_SESSION_KEY)
+  const session = getCookie("admin_session")
   if (!session) return null
-  
   try {
     return JSON.parse(decodeURIComponent(session))
   } catch {
@@ -73,32 +80,12 @@ export function getAdminSession(): AdminCredentials | null {
   }
 }
 
-/**
- * Enregistre une session admin dans un cookie
- */
 export function setAdminSession(credentials: AdminCredentials): void {
-  if (typeof document === "undefined") return
-  
-  const value = encodeURIComponent(JSON.stringify(credentials))
-  const maxAge = COOKIE_MAX_AGE_DAYS * 24 * 60 * 60
-  
-  document.cookie = `${ADMIN_SESSION_KEY}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`
+  if (typeof window === "undefined") return
+  setCookie("admin_session", encodeURIComponent(JSON.stringify(credentials)))
 }
 
-/**
- * Supprime la session admin
- */
 export function clearAdminSession(): void {
-  if (typeof document === "undefined") return
-  
-  document.cookie = `${ADMIN_SESSION_KEY}=; path=/; max-age=0`
-}
-
-/**
- * Helper pour lire un cookie par son nom
- */
-function getCookieValue(name: string): string | null {
-  if (typeof document === "undefined") return null
-  const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
-  return matches ? matches[1] : null
+  if (typeof window === "undefined") return
+  deleteCookie("admin_session")
 }

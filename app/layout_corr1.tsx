@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   keywords: ["plan de classe", "salle de classe", "gestion scolaire", "placement élèves"],
   authors: [{ name: "Votre Établissement" }],
   robots: {
-    index: false,
+    index: false, // Ne pas indexer l'application
     follow: false,
   },
 }

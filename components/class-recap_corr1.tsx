@@ -17,29 +17,26 @@ export function ClassRecap({ classData }: ClassRecapProps) {
   const { shareData } = useShare()
   
   // État pour stocker les données des assignments chargées depuis localStorage
-  // Chargées dans useEffect pour éviter les erreurs d'hydratation SSR
   const [assignmentsData, setAssignmentsData] = useState<Record<string, Record<string, any>>>({})
 
-  // Charger les données localStorage dans useEffect (côté client uniquement)
+  // Charger les données localStorage dans useEffect pour éviter les erreurs d'hydratation
   useEffect(() => {
     const loadAssignments = () => {
       const assignments: Record<string, Record<string, any>> = {}
-      const storageKey = `seatAssignments_${shareData?.classCode || ""}`
-      
-      try {
-        const savedData = localStorage.getItem(storageKey)
-        if (savedData) {
-          const allAssignments = JSON.parse(savedData)
-          classData.rooms.forEach((room) => {
+      classData.rooms.forEach((room) => {
+        try {
+          const storageKey = `seatAssignments_${shareData?.classCode || ""}`
+          const savedData = localStorage.getItem(storageKey)
+          if (savedData) {
+            const allAssignments = JSON.parse(savedData)
             if (allAssignments && allAssignments[room.id]) {
               assignments[room.id] = allAssignments[room.id]
             }
-          })
+          }
+        } catch (e) {
+          console.error("Erreur lors du chargement des assignments:", e)
         }
-      } catch (e) {
-        console.error("Erreur lors du chargement des assignments:", e)
-      }
-      
+      })
       setAssignmentsData(assignments)
     }
     
@@ -55,6 +52,10 @@ export function ClassRecap({ classData }: ClassRecapProps) {
     return totalAssigned
   }
 
+  const totalStudents = classData.students.length
+  const totalRooms = classData.rooms.length
+  const totalPlans = calculateAssignedSeats()
+
   // Calculer le nombre total de places disponibles
   const calculateTotalSeats = () => {
     let total = 0
@@ -66,9 +67,6 @@ export function ClassRecap({ classData }: ClassRecapProps) {
     return total
   }
 
-  const totalStudents = classData.students.length
-  const totalRooms = classData.rooms.length
-  const totalPlans = calculateAssignedSeats()
   const totalSeats = calculateTotalSeats()
 
   return (
@@ -111,7 +109,7 @@ export function ClassRecap({ classData }: ClassRecapProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600 dark:text-green-300">{totalPlans}</div>
-            <p className="text-sm text-muted-foreground mt-1">Places attribuées</p>
+            <p className="text-sm text-muted-foreground mt-1">Plans de classe</p>
           </CardContent>
         </Card>
 

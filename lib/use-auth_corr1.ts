@@ -3,10 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { getAdminSession } from "@/lib/admin-auth"
-
-// Clé de session unifiée (doit correspondre à custom-auth.ts)
-const SESSION_KEY = "user_session"
+import { getAdminSession, type AdminCredentials } from "@/lib/admin-auth"
 
 export interface AuthUser {
   id: string
@@ -16,7 +13,16 @@ export interface AuthUser {
   firstName?: string
   lastName?: string
   email?: string
-  authType: "custom" | "admin" | "supabase"
+  authType: "custom" | "admin"
+}
+
+// Nom de la clé de session (doit correspondre à custom-auth.ts)
+const SESSION_KEY = "custom_auth_user"
+
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") return null
+  const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+  return matches ? matches[1] : null
 }
 
 interface UseAuthOptions {
@@ -24,26 +30,28 @@ interface UseAuthOptions {
   redirectTo?: string
 }
 
-/**
- * Hook d'authentification principal
- * Vérifie dans l'ordre : session custom, session admin, session Supabase
- */
 export function useAuth(options?: UseAuthOptions) {
   const router = useRouter()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const checkAuth = useCallback(async () => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined") {
+      return
+    }
+
+    console.log("[useAuth] Checking authentication...")
 
     // 1. Vérifier la session custom (cookie puis localStorage)
     const customUser = await checkCustomSession()
     if (customUser) {
       if (options?.requireRole && customUser.role !== options.requireRole) {
+        console.log(`[useAuth] Role mismatch: ${customUser.role} !== ${options.requireRole}`)
         router.push(options.redirectTo || "/dashboard")
         setIsLoading(false)
         return
       }
+      console.log("[useAuth] Custom auth user found:", customUser.username)
       setUser(customUser)
       setIsLoading(false)
       return
@@ -53,29 +61,19 @@ export function useAuth(options?: UseAuthOptions) {
     const adminUser = await checkAdminSession()
     if (adminUser) {
       if (options?.requireRole && adminUser.role !== options.requireRole) {
+        console.log(`[useAuth] Role mismatch: ${adminUser.role} !== ${options.requireRole}`)
         router.push(options.redirectTo || "/dashboard")
         setIsLoading(false)
         return
       }
+      console.log("[useAuth] Admin user found:", adminUser.username)
       setUser(adminUser)
       setIsLoading(false)
       return
     }
 
-    // 3. Vérifier la session Supabase native
-    const supabaseUser = await checkSupabaseSession()
-    if (supabaseUser) {
-      if (options?.requireRole && supabaseUser.role !== options.requireRole) {
-        router.push(options.redirectTo || "/dashboard")
-        setIsLoading(false)
-        return
-      }
-      setUser(supabaseUser)
-      setIsLoading(false)
-      return
-    }
-
-    // 4. Aucune authentification trouvée
+    // 3. Aucune authentification trouvée
+    console.log("[useAuth] No authentication found, redirecting to login")
     setIsLoading(false)
     router.push(options?.redirectTo || "/auth/login")
   }, [router, options?.requireRole, options?.redirectTo])
@@ -87,9 +85,6 @@ export function useAuth(options?: UseAuthOptions) {
   return { user, isLoading, refresh: checkAuth }
 }
 
-/**
- * Vérifie la session custom (cookie + localStorage)
- */
 async function checkCustomSession(): Promise<AuthUser | null> {
   try {
     // Essayer le cookie d'abord
@@ -99,8 +94,8 @@ async function checkCustomSession(): Promise<AuthUser | null> {
     if (cookieValue) {
       try {
         sessionData = JSON.parse(decodeURIComponent(cookieValue))
-      } catch {
-        // Cookie invalide, ignorer
+      } catch (e) {
+        console.error("[useAuth] Error parsing cookie:", e)
       }
     }
 
@@ -110,8 +105,8 @@ async function checkCustomSession(): Promise<AuthUser | null> {
       if (localValue) {
         try {
           sessionData = JSON.parse(localValue)
-        } catch {
-          // LocalStorage invalide, ignorer
+        } catch (e) {
+          console.error("[useAuth] Error parsing localStorage:", e)
         }
       }
     }
@@ -120,6 +115,7 @@ async function checkCustomSession(): Promise<AuthUser | null> {
 
     // Valider les champs requis
     if (!sessionData.id || !sessionData.establishment_id || !sessionData.role) {
+      console.error("[useAuth] Session missing required fields:", sessionData)
       clearInvalidSession()
       return null
     }
@@ -135,15 +131,12 @@ async function checkCustomSession(): Promise<AuthUser | null> {
       authType: "custom",
     }
   } catch (error) {
-    console.error("Error checking custom session:", error)
+    console.error("[useAuth] Error checking custom session:", error)
     clearInvalidSession()
     return null
   }
 }
 
-/**
- * Vérifie la session admin (codes hardcodés)
- */
 async function checkAdminSession(): Promise<AuthUser | null> {
   try {
     const adminSession = getAdminSession()
@@ -165,91 +158,30 @@ async function checkAdminSession(): Promise<AuthUser | null> {
       authType: "admin",
     }
   } catch (error) {
-    console.error("Error checking admin session:", error)
+    console.error("[useAuth] Error checking admin session:", error)
     return null
   }
 }
 
-/**
- * Vérifie la session Supabase native
- */
-async function checkSupabaseSession(): Promise<AuthUser | null> {
-  try {
-    const supabase = createClient()
-    const { data: { user: supabaseUser }, error } = await supabase.auth.getUser()
-
-    if (error || !supabaseUser) return null
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", supabaseUser.id)
-      .single()
-
-    if (!profile) return null
-
-    return {
-      id: supabaseUser.id,
-      establishmentId: profile.establishment_id,
-      role: profile.role,
-      username: profile.username,
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-      email: profile.email,
-      authType: "supabase",
-    }
-  } catch (error) {
-    console.error("Error checking Supabase session:", error)
-    return null
-  }
-}
-
-/**
- * Helper pour lire un cookie
- */
-function getCookieValue(name: string): string | null {
-  if (typeof document === "undefined") return null
-  const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
-  return matches ? matches[1] : null
-}
-
-/**
- * Nettoie une session invalide
- */
 function clearInvalidSession(): void {
   localStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem("user_session") // Nettoyer l'ancien nom aussi
   document.cookie = `${SESSION_KEY}=; path=/; max-age=0`
-  // Nettoyer aussi l'ancienne clé (migration)
-  localStorage.removeItem("custom_auth_user")
   document.cookie = "custom_auth_user=; path=/; max-age=0"
 }
 
-/**
- * Hook pour la déconnexion
- */
+// Hook pour la déconnexion
 export function useLogout() {
   const router = useRouter()
 
-  const logout = useCallback(async () => {
-    // Supprimer session custom
+  const logout = useCallback(() => {
+    // Supprimer toutes les sessions
     localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem("user_session")
     document.cookie = `${SESSION_KEY}=; path=/; max-age=0`
-    
-    // Supprimer session admin
     document.cookie = "admin_session=; path=/; max-age=0"
-    
-    // Nettoyer anciennes clés (migration)
-    localStorage.removeItem("custom_auth_user")
-    document.cookie = "custom_auth_user=; path=/; max-age=0"
 
-    // Déconnecter Supabase si connecté
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-    } catch {
-      // Ignorer les erreurs de déconnexion Supabase
-    }
-
+    console.log("[useAuth] User logged out")
     router.push("/auth/login")
   }, [router])
 

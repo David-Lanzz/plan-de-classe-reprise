@@ -21,32 +21,31 @@ export function LoginForm() {
   const [showConfetti, setShowConfetti] = useState<boolean>(false)
   const [loginSuccess, setLoginSuccess] = useState<boolean>(false)
 
+  // Fonction de connexion optimisée
   const handleLogin = () => {
     if (loading || loginSuccess) return
 
     setLoading(true)
 
-    // Codes d'accès admin (hardcodés - voir admin-auth.ts pour la vraie auth)
+    // Vérification des codes d'accès
     const validCodes: Record<string, string> = {
       delegue: "cpdc001",
       prof: "cpdc002",
       vieScolaire: "cpdc003",
     }
 
-    // Délai court pour l'UX
+    // Simuler un délai de vérification court
     setTimeout(() => {
       if (accessCode === validCodes[userType]) {
-        // Note: La vraie session est gérée par admin-auth.ts ou custom-auth.ts
-        // Ce formulaire est juste pour la démo avec les codes hardcodés
-        
+        // Afficher le succès
         setLoginSuccess(true)
 
-        // Confettis après un court délai
+        // Délai court avant de lancer les confettis
         setTimeout(() => {
           setShowConfetti(true)
         }, 200)
 
-        // Redirection vers le dashboard
+        // Rediriger vers le tableau de bord après un délai court
         setTimeout(() => {
           router.push("/dashboard")
         }, 1000)
@@ -63,7 +62,7 @@ export function LoginForm() {
           variant: "destructive",
         })
 
-        // Animation de secousse
+        // Animation de secousse pour l'input
         const input = document.getElementById("accessCode")
         if (input) {
           input.classList.add("animate-shake")
@@ -75,7 +74,7 @@ export function LoginForm() {
     }, 300)
   }
 
-  // Nettoyage au démontage
+  // Nettoyer les états lors du démontage
   useEffect(() => {
     return () => {
       setShowConfetti(false)
