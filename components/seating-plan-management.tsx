@@ -167,10 +167,11 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
     const { data: subRoomsData } = await subRoomsQuery.order("created_at", { ascending: false })
     if (subRoomsData) setSubRooms(subRoomsData)
 
-    await setAvailableOptions(supabase)
+    // Passer les données directement au lieu de compter sur le state
+    await setAvailableOptions(supabase, teachersData || [], classesData || [])
   }
 
-  const setAvailableOptions = async (supabase: any) => {
+  const setAvailableOptions = async (supabase: any, teachersData: Teacher[], classesData: Class[]) => {
     if (userRole === "professeur") {
       const { data: teacherClasses } = await supabase
         .from("teacher_classes")
@@ -180,7 +181,8 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
       const myClasses = teacherClasses?.map((tc: any) => tc.classes) || []
       setAvailableClasses(myClasses)
 
-      const myTeacher = teachers.find((t) => t.id === userId)
+      // Utiliser teachersData au lieu du state teachers
+      const myTeacher = teachersData.find((t) => t.id === userId)
       setAvailableTeachers(myTeacher ? [myTeacher] : [])
     } else if (userRole === "delegue" || userRole === "eco-delegue") {
       const { data: studentData } = await supabase.from("students").select("class_id").eq("id", userId).single()
@@ -196,12 +198,14 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
 
         setAvailableTeachers(allowedTeachers)
 
-        const myClass = classes.find((c) => c.id === studentData.class_id)
+        // Utiliser classesData au lieu du state classes
+        const myClass = classesData.find((c) => c.id === studentData.class_id)
         setAvailableClasses(myClass ? [myClass] : [])
       }
     } else {
-      setAvailableTeachers(teachers)
-      setAvailableClasses(classes)
+      // Vie-scolaire : utiliser les données passées en paramètre
+      setAvailableTeachers(teachersData)
+      setAvailableClasses(classesData)
     }
   }
 
