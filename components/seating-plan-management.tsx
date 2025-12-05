@@ -289,13 +289,35 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
       const subRoomName = `${selectedRoom.name} ${classNames} ${teacherName}`
 
       // Pour les professeurs, userId est le teacher.id, mais created_by exige profiles.id
-      // On doit utiliser le profile_id du teacher actuel
+      // Pour les délégués, userId est le student.id, même problème
+      // On doit trouver le profile_id correspondant
       let createdByProfileId = userId
+      
       if (userRole === "professeur") {
         // Chercher le teacher actuel pour obtenir son profile_id
         const currentTeacher = teachers.find((t) => t.id === userId)
         if (currentTeacher?.profile_id) {
           createdByProfileId = currentTeacher.profile_id
+        }
+      } else if (userRole === "delegue" || userRole === "eco-delegue") {
+        // Pour les délégués, chercher le student pour obtenir son username
+        // puis chercher le profile correspondant
+        const { data: studentData } = await supabase
+          .from("students")
+          .select("username")
+          .eq("id", userId)
+          .single()
+        
+        if (studentData?.username) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("username", studentData.username)
+            .single()
+          
+          if (profileData?.id) {
+            createdByProfileId = profileData.id
+          }
         }
       }
 
