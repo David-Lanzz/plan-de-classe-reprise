@@ -69,16 +69,11 @@ export function useArchivedSubRooms(options: UseArchivedSubRoomsOptions = {}): U
       const { data, error: fetchError } = await query
 
       if (fetchError) {
-        // Si la table n'existe pas encore, on ne crash pas
-        console.warn('Erreur archived_sub_rooms:', fetchError.message)
-        setArchives([])
-        return
+        throw fetchError
       }
 
-      setArchives(Array.isArray(data) ? data : [])
+      setArchives(data || [])
     } catch (err) {
-      console.error('Erreur fetchArchives:', err)
-      setArchives([])
       setError(err instanceof Error ? err : new Error('Erreur lors du chargement des archives'))
     } finally {
       setLoading(false)

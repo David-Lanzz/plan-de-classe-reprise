@@ -71,27 +71,19 @@ export function useAuditLogs(options: UseAuditLogsOptions = {}): UseAuditLogsRet
       const { data, error: fetchError } = await query
 
       if (fetchError) {
-        // Si la table n'existe pas encore, on ne crash pas
-        console.warn('Erreur audit_logs:', fetchError.message)
-        setLogs([])
-        setHasMore(false)
-        return
+        throw fetchError
       }
 
-      const safeData = Array.isArray(data) ? data : []
-
       if (reset) {
-        setLogs(safeData)
+        setLogs(data || [])
         setOffset(limit)
       } else {
-        setLogs(prev => [...prev, ...safeData])
+        setLogs(prev => [...prev, ...(data || [])])
         setOffset(prev => prev + limit)
       }
       
-      setHasMore(safeData.length === limit)
+      setHasMore((data?.length || 0) === limit)
     } catch (err) {
-      console.error('Erreur fetchLogs:', err)
-      setLogs([])
       setError(err instanceof Error ? err : new Error('Erreur lors du chargement'))
     } finally {
       setLoading(false)

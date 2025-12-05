@@ -28,9 +28,18 @@ import { TeachersManagement } from "@/components/teachers-management"
 import { ClassesManagement } from "@/components/classes-management"
 import { RoomsManagement } from "@/components/rooms-management"
 import { SeatingPlanManagement } from "@/components/seating-plan-management"
-// Nouveaux imports pour historique et archivage
-import { AuditLogViewer } from "@/components/audit-log-viewer"
-import { ArchivedSubRoomsManager } from "@/components/archived-subrooms-manager"
+// Imports dynamiques pour historique et archivage (évite les erreurs si non utilisés)
+import dynamic from "next/dynamic"
+
+const AuditLogViewer = dynamic(
+  () => import("@/components/audit-log-viewer").then(mod => ({ default: mod.AuditLogViewer })),
+  { ssr: false, loading: () => <div className="p-8 text-center">Chargement...</div> }
+)
+
+const ArchivedSubRoomsManager = dynamic(
+  () => import("@/components/archived-subrooms-manager").then(mod => ({ default: mod.ArchivedSubRoomsManager })),
+  { ssr: false, loading: () => <div className="p-8 text-center">Chargement...</div> }
+)
 
 interface DashboardContentProps {
   user: User
