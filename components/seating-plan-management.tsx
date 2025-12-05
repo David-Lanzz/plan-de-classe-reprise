@@ -182,7 +182,7 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
       setAvailableClasses(myClasses)
 
       // Utiliser teachersData au lieu du state teachers
-      const myTeacher = teachersData.find((t) => t.id === userId)
+      const myTeacher = teachersData.find((t) => t.profile_id === userId)
       setAvailableTeachers(myTeacher ? [myTeacher] : [])
     } else if (userRole === "delegue" || userRole === "eco-delegue") {
       const { data: studentData } = await supabase.from("students").select("class_id").eq("id", userId).single()
