@@ -58,7 +58,7 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
     email: "",
     subject: "",
     classes: [] as string[],
-    allow_delegate_subrooms: false, // Added allow_delegate_subrooms state
+    allow_delegate_subrooms: true, // Défaut TRUE selon spec 4.1.1
   })
 
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([])
@@ -302,7 +302,7 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
         email: "",
         subject: "",
         classes: [],
-        allow_delegate_subrooms: false, // Reset allow_delegate_subrooms
+        allow_delegate_subrooms: true, // Reset avec défaut TRUE
       })
 
       setIsPrincipal(false)
@@ -385,7 +385,7 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
         email: "",
         subject: "",
         classes: [],
-        allow_delegate_subrooms: false, // Reset allow_delegate_subrooms
+        allow_delegate_subrooms: true, // Reset avec défaut TRUE
       })
       setIsPrincipal(false)
       setPrincipalClassId("")
