@@ -77,8 +77,9 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
     password: "",
   })
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]) // Added class filter state
-  const [isPromoteDialogOpen, setIsPromoteDialogOpen] = useState(false) // Added promote dialog state
+  const [isPromoteDialogOpen, setIsPromoteDialogOpen] = useState(false)
   const [promoteToRole, setPromoteToRole] = useState<"delegue" | "eco-delegue">("delegue")
+  const [upgradeCredentials, setUpgradeCredentials] = useState({ username: "", password: "" })
   const [isDemoteDialogOpen, setIsDemoteDialogOpen] = useState(false)
   const [studentToDemote, setStudentToDemote] = useState<Student | null>(null)
   const { toast } = useToast()
@@ -604,6 +605,15 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
     try {
       console.log("[v0] Promoting student:", student.id, "to role:", newRole)
 
+      if (!upgradeCredentials.username || !upgradeCredentials.password) {
+        toast({
+          title: "Erreur",
+          description: "Veuillez définir un identifiant et un mot de passe",
+          variant: "destructive",
+        })
+        return
+      }
+
       if (student.profile_id && student.profile_id !== "null") {
         toast({
           title: "Erreur",
@@ -616,32 +626,50 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
       const supabase = createClient()
       const { data: classData } = await supabase.from("classes").select("name").eq("id", student.class_id).single()
 
-      const credentials = await createUser({
-        establishment_id: establishmentId,
-        role: "delegue",
-        first_name: student.first_name,
-        last_name: student.last_name,
-        email: student.email || undefined,
-        phone: student.phone || undefined,
-        class_id: student.class_id || undefined,
-        class_name: classData?.name, // Pass class_name for proper username format
-        student_role: newRole,
+      const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
+        password: upgradeCredentials.password,
       })
 
-      console.log("[v0] User created successfully:", credentials)
+      if (hashError) {
+        console.error("[v0] Error hashing password:", hashError)
+        throw hashError
+      }
+
+      const { data: newProfile, error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          establishment_id: establishmentId,
+          role: "delegue", // This role is for the profile itself, distinct from student.role
+          username: upgradeCredentials.username,
+          password_hash: hashedPassword,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          email: student.email || null,
+          phone: student.phone || null,
+        })
+        .select()
+        .single()
+
+      if (profileError) {
+        console.error("[v0] Error creating profile:", profileError)
+        throw profileError
+      }
+
+      console.log("[v0] Profile created successfully:", newProfile)
 
       const { error: updateError } = await supabase
         .from("students")
         .update({
           role: newRole,
-          profile_id: credentials.profile_id,
+          profile_id: newProfile.id,
+          class_name: classData?.name,
         })
         .eq("id", student.id)
 
       if (updateError) {
         console.error("[v0] Error updating student:", updateError)
-        // Supprimer le profil créé en cas d'erreur
-        await supabase.from("profiles").delete().eq("id", credentials.profile_id)
+        // Cleanup: delete the profile if student update fails
+        await supabase.from("profiles").delete().eq("id", newProfile.id)
         throw updateError
       }
 
@@ -653,10 +681,10 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
           <div className="space-y-2">
             <p>L'élève a été promu au rôle de {newRole === "delegue" ? "Délégué" : "Éco-délégué"}</p>
             <p>
-              Identifiant: <strong>{credentials.username}</strong>
+              Identifiant: <strong>{upgradeCredentials.username}</strong>
             </p>
             <p>
-              Mot de passe: <strong>{credentials.password}</strong>
+              Mot de passe: <strong>{upgradeCredentials.password}</strong>
             </p>
           </div>
         ),
@@ -664,6 +692,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
       })
 
       setIsPromoteDialogOpen(false)
+      setUpgradeCredentials({ username: "", password: "" })
       fetchData() // Auto-refresh after promotion
     } catch (error) {
       console.error("[v0] Error promoting student:", error)
@@ -748,7 +777,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
   async function handleUpdateCredentials() {
     if (!selectedStudent) return
 
-    if (!selectedStudent.profile_id || selectedStudent.profile_id === "null") {
+    if (!selectedStudent.profile_id || selectedStudent.profile_id === "null" || selectedStudent.profile_id === "") {
       toast({
         title: "Erreur",
         description: "Cet élève n'a pas de profil utilisateur",
@@ -759,7 +788,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
 
     const supabase = createClient()
 
-    if (accessData.password !== "••••••••" && accessData.password !== "") {
+    if (accessData.password && accessData.password !== "••••••••" && accessData.password.trim() !== "") {
       const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
         password: accessData.password,
       })
@@ -768,7 +797,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
         console.error("[v0] Error hashing password:", hashError)
         toast({
           title: "Erreur",
-          description: "Impossible de mettre à jour les identifiants",
+          description: "Impossible de hasher le mot de passe",
           variant: "destructive",
         })
         return
@@ -791,8 +820,9 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
         })
         return
       }
+
+      console.log("[v0] Profile updated with new password")
     } else {
-      // Only update username
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -804,11 +834,13 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
         console.error("[v0] Error updating profile:", updateError)
         toast({
           title: "Erreur",
-          description: "Impossible de mettre à jour les identifiants",
+          description: "Impossible de mettre à jour l'identifiant",
           variant: "destructive",
         })
         return
       }
+
+      console.log("[v0] Profile updated (username only)")
     }
 
     toast({
@@ -1439,7 +1471,8 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
           <DialogHeader>
             <DialogTitle>Promouvoir l'élève</DialogTitle>
             <DialogDescription>
-              Choisissez le rôle pour {selectedStudent?.first_name} {selectedStudent?.last_name}
+              Choisissez le rôle et définissez les identifiants pour {selectedStudent?.first_name}{" "}
+              {selectedStudent?.last_name}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1458,9 +1491,40 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="upgrade-username">Identifiant</Label>
+              <Input
+                id="upgrade-username"
+                value={upgradeCredentials.username}
+                onChange={(e) => setUpgradeCredentials({ ...upgradeCredentials, username: e.target.value })}
+                placeholder={
+                  selectedStudent
+                    ? `${selectedStudent.last_name.toUpperCase()}.${selectedStudent.first_name.toLowerCase()}.${selectedStudent.class_name || "CLASSE"}`
+                    : "Identifiant"
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">Format: NOM.prenom.CLASSE (ex: DUPONT.jean.5B)</p>
+            </div>
+            <div>
+              <Label htmlFor="upgrade-password">Mot de passe</Label>
+              <Input
+                id="upgrade-password"
+                type="text"
+                value={upgradeCredentials.password}
+                onChange={(e) => setUpgradeCredentials({ ...upgradeCredentials, password: e.target.value })}
+                placeholder="Définir un mot de passe"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Ce mot de passe sera envoyé à l'élève par email</p>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPromoteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPromoteDialogOpen(false)
+                setUpgradeCredentials({ username: "", password: "" })
+              }}
+            >
               Annuler
             </Button>
             <Button onClick={() => selectedStudent && handlePromoteStudent(selectedStudent, promoteToRole)}>
