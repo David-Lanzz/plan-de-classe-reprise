@@ -37,6 +37,7 @@ Ces scripts historiques ont été consolidés dans `000_complete_schema.sql`.
 | `046_verify_database_integrity.sql` | Diagnostic complet de la base | Maintenance |
 | `047_reset_all_data.sql` | Supprime toutes les données (conserve schéma) | Reset |
 | `048_export_data_for_migration.sql` | Génère les INSERT pour migration | Migration |
+| `049_diagnostic_rls_policies.sql` | Diagnostique les RLS Policies en cas migration | Migration |
 
 ### Scripts TypeScript (utilitaires)
 
