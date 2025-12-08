@@ -515,8 +515,19 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
       return
     }
 
+    if (!accessData.username || accessData.username.trim() === "") {
+      toast({
+        title: "Erreur",
+        description: "L'identifiant ne peut pas être vide",
+        variant: "destructive",
+      })
+      return
+    }
+
     const supabase = createClient()
-    if (accessData.password !== "••••••••" && accessData.password !== "") {
+
+    if (accessData.password !== "••••••••" && accessData.password.trim() !== "") {
+      console.log("[v0] Updating teacher profile with new password")
       const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
         password: accessData.password,
       })
@@ -548,8 +559,10 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
         })
         return
       }
+
+      console.log("[v0] Teacher profile updated with new password")
     } else {
-      // Only update username
+      console.log("[v0] Updating teacher profile (username only)")
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -566,6 +579,8 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
         })
         return
       }
+
+      console.log("[v0] Teacher profile updated (username only)")
     }
 
     toast({
@@ -573,7 +588,7 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
       description: "Identifiants mis à jour avec succès",
     })
     setIsAccessDialogOpen(false)
-    fetchData() // Refresh data to show updated credentials
+    fetchData()
   }
 
   const handleSendEmail = () => {

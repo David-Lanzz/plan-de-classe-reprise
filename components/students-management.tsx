@@ -53,6 +53,33 @@ interface StudentsManagementProps {
   onBack?: () => void
 }
 
+function generateStrongPassword(length = 8): string {
+  const lowercase = "abcdefghijklmnopqrstuvwxyz"
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const numbers = "0123456789"
+  const symbols = "!@#$%&*"
+
+  const allChars = lowercase + uppercase + numbers + symbols
+
+  let password = ""
+  // Ensure at least one of each type
+  password += lowercase[Math.floor(Math.random() * lowercase.length)]
+  password += uppercase[Math.floor(Math.random() * uppercase.length)]
+  password += numbers[Math.floor(Math.random() * numbers.length)]
+  password += symbols[Math.floor(Math.random() * symbols.length)]
+
+  // Fill the rest randomly
+  for (let i = password.length; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)]
+  }
+
+  // Shuffle the password
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("")
+}
+
 export function StudentsManagement({ establishmentId, userRole, userId, onBack }: StudentsManagementProps) {
   const router = useRouter()
   const [students, setStudents] = useState<Student[]>([])
@@ -100,6 +127,24 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [isBulkEmailDialogOpen, setIsBulkEmailDialogOpen] = useState(false)
   // End of updates for email dialogs
+
+  useEffect(() => {
+    if (isPromoteDialogOpen && selectedStudent) {
+      // Normalize class name (remove "ème" and other accents)
+      const normalizeClassName = (className: string | undefined) => {
+        if (!className) return "CLASSE"
+        return className.replace(/ème/gi, "").replace(/\s+/g, "").toUpperCase()
+      }
+
+      const suggestedUsername = `${selectedStudent.last_name.toUpperCase()}.${selectedStudent.first_name.toLowerCase()}.${normalizeClassName(selectedStudent.class_name)}`
+      const suggestedPassword = generateStrongPassword(8)
+
+      setUpgradeCredentials({
+        username: suggestedUsername,
+        password: suggestedPassword,
+      })
+    }
+  }, [isPromoteDialogOpen, selectedStudent])
 
   useEffect(() => {
     fetchData()
@@ -774,6 +819,13 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
     setIsAccessDialogOpen(true)
   }
 
+  // Function to open the promotion dialog (needed for the error fix)
+  const openPromoteDialog = (student: Student, role: "delegue" | "eco-delegue") => {
+    setSelectedStudent(student)
+    setPromoteToRole(role)
+    setIsPromoteDialogOpen(true)
+  }
+
   async function handleUpdateCredentials() {
     if (!selectedStudent) return
 
@@ -786,9 +838,19 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
       return
     }
 
+    if (!accessData.username || accessData.username.trim() === "") {
+      toast({
+        title: "Erreur",
+        description: "L'identifiant ne peut pas être vide",
+        variant: "destructive",
+      })
+      return
+    }
+
     const supabase = createClient()
 
     if (accessData.password && accessData.password !== "••••••••" && accessData.password.trim() !== "") {
+      console.log("[v0] Updating profile with new password")
       const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
         password: accessData.password,
       })
@@ -823,6 +885,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
 
       console.log("[v0] Profile updated with new password")
     } else {
+      console.log("[v0] Updating profile (username only)")
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -849,7 +912,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
     })
 
     setIsAccessDialogOpen(false)
-    fetchData() // Refresh data to show updated credentials
+    fetchData()
   }
   // END OF MODIFIED FUNCTIONS
 
@@ -953,7 +1016,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
         </Card>
       )}
 
-      {/* Start of updates */}
+      {/* Start of updates for search and filter */}
       {classes.length > 0 && (
         <Card>
           <CardHeader>
@@ -1032,7 +1095,7 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
           </CardContent>
         </Card>
       )}
-      {/* End of updates */}
+      {/* End of updates for search and filter */}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -1167,7 +1230,8 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedStudent(student)
-                            setIsPromoteDialogOpen(true)
+                            // Use the new openPromoteDialog function
+                            openPromoteDialog(student, "delegue")
                           }}
                         >
                           <Key className="mr-2 h-4 w-4" />
@@ -1413,15 +1477,24 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
             </div>
             <div>
               <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="text"
-                value={accessData.password}
-                onChange={(e) => setAccessData({ ...accessData, password: e.target.value })}
-                placeholder="Saisir un nouveau mot de passe"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="password"
+                  type="text"
+                  value={accessData.password}
+                  onChange={(e) => setAccessData({ ...accessData, password: e.target.value })}
+                  placeholder="Saisir un nouveau mot de passe"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAccessData({ ...accessData, password: generateStrongPassword(8) })}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Définissez un nouveau mot de passe. Ce mot de passe sera visible dans l'email envoyé à l'élève.
+                Définissez un nouveau mot de passe. Cliquez sur l'icône pour générer un mot de passe fort.
               </p>
             </div>
           </div>
@@ -1497,24 +1570,29 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
                 id="upgrade-username"
                 value={upgradeCredentials.username}
                 onChange={(e) => setUpgradeCredentials({ ...upgradeCredentials, username: e.target.value })}
-                placeholder={
-                  selectedStudent
-                    ? `${selectedStudent.last_name.toUpperCase()}.${selectedStudent.first_name.toLowerCase()}.${selectedStudent.class_name || "CLASSE"}`
-                    : "Identifiant"
-                }
               />
               <p className="text-xs text-muted-foreground mt-1">Format: NOM.prenom.CLASSE (ex: DUPONT.jean.5B)</p>
             </div>
             <div>
               <Label htmlFor="upgrade-password">Mot de passe</Label>
-              <Input
-                id="upgrade-password"
-                type="text"
-                value={upgradeCredentials.password}
-                onChange={(e) => setUpgradeCredentials({ ...upgradeCredentials, password: e.target.value })}
-                placeholder="Définir un mot de passe"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Ce mot de passe sera envoyé à l'élève par email</p>
+              <div className="flex gap-2">
+                <Input
+                  id="upgrade-password"
+                  type="text"
+                  value={upgradeCredentials.password}
+                  onChange={(e) => setUpgradeCredentials({ ...upgradeCredentials, password: e.target.value })}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setUpgradeCredentials({ ...upgradeCredentials, password: generateStrongPassword(8) })}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Mot de passe fort généré automatiquement (modifiable)
+              </p>
             </div>
           </div>
           <DialogFooter>

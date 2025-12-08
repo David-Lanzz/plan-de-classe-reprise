@@ -45,6 +45,30 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
     password: "",
   })
 
+  function generateStrongPassword(length = 8): string {
+    const lowercase = "abcdefghijklmnopqrstuvwxyz"
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    const numbers = "0123456789"
+    const symbols = "!@#$%&*"
+
+    const allChars = lowercase + uppercase + numbers + symbols
+
+    let password = ""
+    password += lowercase[Math.floor(Math.random() * lowercase.length)]
+    password += uppercase[Math.floor(Math.random() * uppercase.length)]
+    password += numbers[Math.floor(Math.random() * numbers.length)]
+    password += symbols[Math.floor(Math.random() * symbols.length)]
+
+    for (let i = password.length; i < length; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)]
+    }
+
+    return password
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("")
+  }
+
   const handleLogout = async () => {
     setIsLoggingOut(true)
 
@@ -91,15 +115,14 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
     }
 
     if (!profileData) {
-      // Profile doesn't exist, create default values
       setSettingsData({
         username: profile.username || `${profile.first_name.toLowerCase()}.${profile.last_name.toLowerCase()}`,
-        password: "••••••••",
+        password: "", // Empty string so user knows they can set new password
       })
     } else {
       setSettingsData({
         username: profileData.username || "",
-        password: "••••••••",
+        password: "", // Empty string so user knows they can set new password
       })
     }
 
@@ -107,9 +130,19 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
   }
 
   const handleUpdateCredentials = async () => {
+    if (!settingsData.username || settingsData.username.trim() === "") {
+      toast({
+        title: "Erreur",
+        description: "L'identifiant ne peut pas être vide",
+        variant: "destructive",
+      })
+      return
+    }
+
     const supabase = createClient()
 
-    if (settingsData.password !== "••••••••") {
+    if (settingsData.password !== "") {
+      console.log("[v0] Updating user password in settings")
       const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
         password: settingsData.password,
       })
@@ -141,7 +174,10 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
         })
         return
       }
+
+      console.log("[v0] User password updated successfully")
     } else {
+      console.log("[v0] Updating username only in settings")
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -158,6 +194,8 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
         })
         return
       }
+
+      console.log("[v0] Username updated successfully")
     }
 
     toast({
@@ -571,15 +609,27 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
               />
             </div>
             <div>
-              <Label htmlFor="settings-password">Mot de passe</Label>
-              <Input
-                id="settings-password"
-                type="text"
-                value={settingsData.password}
-                onChange={(e) => setSettingsData({ ...settingsData, password: e.target.value })}
-                placeholder="Saisir un nouveau mot de passe"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Laissez vide pour conserver le mot de passe actuel</p>
+              <Label htmlFor="settings-password">Nouveau mot de passe</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="settings-password"
+                  type="text"
+                  value={settingsData.password}
+                  onChange={(e) => setSettingsData({ ...settingsData, password: e.target.value })}
+                  placeholder="Saisir un nouveau mot de passe"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSettingsData({ ...settingsData, password: generateStrongPassword(8) })}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Laissez vide pour conserver le mot de passe actuel. Cliquez sur l'icône pour générer un mot de passe
+                fort.
+              </p>
             </div>
           </div>
           <DialogFooter className="sm:justify-end">
