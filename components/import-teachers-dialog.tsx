@@ -94,11 +94,36 @@ export function ImportTeachersDialog({
 
             if (mapping !== "ignore" && value) {
               if (mapping === "classes") {
-                // Parse multiple classes (comma or semicolon separated)
-                const classNames = value.split(/[,;]/).map((c) => c.trim())
-                const classIds = classNames
-                  .map((name) => availableClasses.find((c) => c.name === name)?.id)
+                const classNames = value
+                  .split(/[,;]/)
+                  .map((c) =>
+                    c
+                      .trim()
+                      .replace(/ème|eme|ère|ere/gi, "")
+                      .replace(/\s+/g, ""),
+                  )
                   .filter(Boolean)
+
+                console.log("[v0] Parsed class names:", classNames)
+                console.log(
+                  "[v0] Available classes:",
+                  availableClasses.map((c) => c.name),
+                )
+
+                const classIds = classNames
+                  .map((inputName) => {
+                    const normalizedInput = inputName.toLowerCase()
+                    return availableClasses.find((c) => {
+                      const normalizedAvailable = c.name
+                        .replace(/ème|eme|ère|ere/gi, "")
+                        .replace(/\s+/g, "")
+                        .toLowerCase()
+                      return normalizedAvailable === normalizedInput
+                    })?.id
+                  })
+                  .filter(Boolean)
+
+                console.log("[v0] Matched class IDs:", classIds)
                 teacherData.class_ids = classIds
               } else {
                 teacherData[mapping] = value

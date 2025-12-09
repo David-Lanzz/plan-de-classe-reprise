@@ -100,36 +100,60 @@ export async function createUser(params: CreateUserParams): Promise<UserCredenti
   const username = params.username || generateUsernameWithClass(params.first_name, params.last_name, className)
   const password = params.password || generatePassword()
 
-  // 2. Hasher le mot de passe côté serveur avec la fonction SQL
-  const { data: hashedData, error: hashError } = await supabase.rpc("hash_password", { password })
-
-  if (hashError) {
-    console.error("Error hashing password:", hashError)
-    throw new Error("Erreur lors du hashage du mot de passe")
-  }
-
-  const password_hash = hashedData as string
-
-  // 3. Créer le profil
-  const { data: profile, error: profileError } = await supabase
+  const { data: existingProfile } = await supabase
     .from("profiles")
-    .insert({
-      establishment_id: params.establishment_id,
-      role: params.role,
-      username,
-      password_hash,
-      first_name: params.first_name,
-      last_name: params.last_name,
-      email: params.email,
-      phone: params.phone,
-      can_create_subrooms: params.role === "vie-scolaire" || params.role === "professeur",
-    })
-    .select()
-    .single()
+    .select("id, username, role")
+    .eq("username", username)
+    .maybeSingle()
 
-  if (profileError) {
-    console.error("Error creating profile:", profileError)
-    throw new Error("Erreur lors de la création du profil")
+  let profile: any
+
+  if (existingProfile) {
+    console.log("[v0] Profile already exists, reusing:", existingProfile)
+    profile = existingProfile
+
+    // Si le mot de passe est fourni, mettre à jour le profil existant
+    if (params.password) {
+      const { data: hashedData, error: hashError } = await supabase.rpc("hash_password", { password })
+
+      if (!hashError) {
+        await supabase.from("profiles").update({ password_hash: hashedData }).eq("id", existingProfile.id)
+      }
+    }
+  } else {
+    // 2. Hasher le mot de passe côté serveur avec la fonction SQL
+    const { data: hashedData, error: hashError } = await supabase.rpc("hash_password", { password })
+
+    if (hashError) {
+      console.error("Error hashing password:", hashError)
+      throw new Error("Erreur lors du hashage du mot de passe")
+    }
+
+    const password_hash = hashedData as string
+
+    // 3. Créer le profil
+    const { data: newProfile, error: profileError } = await supabase
+      .from("profiles")
+      .insert({
+        establishment_id: params.establishment_id,
+        role: params.role,
+        username,
+        password_hash,
+        first_name: params.first_name,
+        last_name: params.last_name,
+        email: params.email,
+        phone: params.phone,
+        can_create_subrooms: params.role === "vie-scolaire" || params.role === "professeur",
+      })
+      .select()
+      .single()
+
+    if (profileError) {
+      console.error("Error creating profile:", profileError)
+      throw new Error("Erreur lors de la création du profil")
+    }
+
+    profile = newProfile
   }
 
   // 4. Créer l'enregistrement spécifique selon le rôle
@@ -137,28 +161,64 @@ export async function createUser(params: CreateUserParams): Promise<UserCredenti
     // Cette fonction ne devrait créer un étudiant que si c'est une nouvelle création, pas un upgrade
     console.log("[v0] Profile created for delegate, student record should already exist")
   } else if (params.role === "professeur") {
-    // Créer un professeur
-    const { data: teacher, error: teacherError } = await supabase
+    const { data: existingTeacher } = await supabase
       .from("teachers")
-      .insert({
-        profile_id: profile.id,
-        establishment_id: params.establishment_id,
-        first_name: params.first_name,
-        last_name: params.last_name,
-        email: params.email,
-        subject: params.subject || "",
-      })
-      .select()
-      .single()
+      .select("id")
+      .eq("profile_id", profile.id)
+      .maybeSingle()
 
-    if (teacherError) {
-      console.error("Error creating teacher:", teacherError)
-      await supabase.from("profiles").delete().eq("id", profile.id)
-      throw new Error("Erreur lors de la création du professeur")
+    let teacher: any
+
+    if (existingTeacher) {
+      console.log("[v0] Teacher already exists, updating:", existingTeacher)
+
+      // Mettre à jour le professeur existant
+      const { data: updatedTeacher } = await supabase
+        .from("teachers")
+        .update({
+          first_name: params.first_name,
+          last_name: params.last_name,
+          email: params.email,
+          subject: params.subject || "",
+        })
+        .eq("id", existingTeacher.id)
+        .select()
+        .single()
+
+      teacher = updatedTeacher
+    } else {
+      // Créer un nouveau professeur
+      const { data: newTeacher, error: teacherError } = await supabase
+        .from("teachers")
+        .insert({
+          profile_id: profile.id,
+          establishment_id: params.establishment_id,
+          first_name: params.first_name,
+          last_name: params.last_name,
+          email: params.email,
+          subject: params.subject || "",
+        })
+        .select()
+        .single()
+
+      if (teacherError) {
+        console.error("Error creating teacher:", teacherError)
+
+        // Si le profil vient d'être créé, le supprimer en cas d'erreur
+        if (!existingProfile) {
+          await supabase.from("profiles").delete().eq("id", profile.id)
+        }
+
+        throw new Error("Erreur lors de la création du professeur")
+      }
+
+      teacher = newTeacher
     }
 
     // Associer les classes si fournies
     if (params.class_ids && params.class_ids.length > 0 && teacher) {
+      await supabase.from("teacher_classes").delete().eq("teacher_id", teacher.id)
+
       const classAssignments = params.class_ids.map((class_id) => ({
         teacher_id: teacher.id,
         class_id,
@@ -168,23 +228,25 @@ export async function createUser(params: CreateUserParams): Promise<UserCredenti
 
       if (classError) {
         console.error("Error assigning classes:", classError)
+      } else {
+        console.log("[v0] Successfully assigned", params.class_ids.length, "classes to teacher")
       }
     }
 
-    console.log("[v0] Teacher created successfully")
+    console.log("[v0] Teacher created/updated successfully")
   }
 
   // 5. Enregistrer l'action
   await supabase.from("action_logs").insert({
     user_id: profile.id,
     establishment_id: params.establishment_id,
-    action_type: "create",
+    action_type: existingProfile ? "update" : "create",
     entity_type: params.role === "delegue" ? "student" : params.role === "professeur" ? "teacher" : "profile",
     entity_id: profile.id,
     details: { username, role: params.role },
   })
 
-  console.log("[v0] User created successfully:", { username, profile_id: profile.id })
+  console.log("[v0] User created/updated successfully:", { username, profile_id: profile.id })
 
   return {
     username,
