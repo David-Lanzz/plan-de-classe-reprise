@@ -9,6 +9,8 @@ export interface RoomTemplate {
     seatsPerTable: number
   }[]
   boardPosition: "top" | "bottom" | "left" | "right"
+  isCustom?: boolean
+  isPinned?: boolean
 }
 
 export const ROOM_TEMPLATES: RoomTemplate[] = [

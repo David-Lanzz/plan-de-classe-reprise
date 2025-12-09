@@ -444,6 +444,26 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
     setDraggedStudent(null)
   }
 
+  const getTableStyle = () => {
+    return {
+      backgroundColor: "#B58255", // New brown color for tables
+      borderColor: "#8B5A3C",
+    }
+  }
+
+  const getSeatStyle = (isOccupied: boolean) => {
+    if (isOccupied) {
+      return {
+        backgroundColor: "#CCEDD6", // New green color for occupied seats
+        borderColor: "#A8D5BA",
+      }
+    }
+    return {
+      backgroundColor: "#F3F4F6",
+      borderColor: "#D1D5DB",
+    }
+  }
+
   if (!room) {
     return <div className="flex items-center justify-center h-screen">Chargement...</div>
   }
@@ -601,6 +621,8 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                   onDrop={handleDrop}
                   onRemove={handleRemoveFromSeat}
                   onDragStart={handleDragStart}
+                  getTableStyle={getTableStyle}
+                  getSeatStyle={getSeatStyle}
                 />
               </CardContent>
             </Card>

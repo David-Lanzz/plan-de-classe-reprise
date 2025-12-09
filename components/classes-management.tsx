@@ -15,10 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Plus, Pencil, Trash2, ArrowLeft } from "lucide-react"
+import { MoreHorizontal, Plus, Pencil, Trash2, ArrowLeft, GraduationCap } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation" // Fixed router import for Next.js App Router
+import { useRouter } from "next/navigation"
+import { LevelsManagementDialog } from "@/components/levels-management-dialog"
 
 interface Class {
   id: string
@@ -28,6 +30,11 @@ interface Class {
   created_at: string
 }
 
+interface Level {
+  id: string
+  name: string
+}
+
 interface ClassesManagementProps {
   establishmentId: string
   onBack?: () => void
@@ -35,9 +42,11 @@ interface ClassesManagementProps {
 
 export function ClassesManagement({ establishmentId, onBack }: ClassesManagementProps) {
   const [classes, setClasses] = useState<Class[]>([])
+  const [levels, setLevels] = useState<Level[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isLevelsDialogOpen, setIsLevelsDialogOpen] = useState(false)
   const [selectedClass, setSelectedClass] = useState<Class | null>(null)
   const [formData, setFormData] = useState({ name: "", level: "" })
   const { toast } = useToast()
@@ -45,11 +54,16 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
   const router = useRouter()
 
   useEffect(() => {
-    fetchClasses()
+    fetchData()
   }, [establishmentId])
 
-  async function fetchClasses() {
+  async function fetchData() {
     setLoading(true)
+    await Promise.all([fetchClasses(), fetchLevels()])
+    setLoading(false)
+  }
+
+  async function fetchClasses() {
     const { data, error } = await supabase
       .from("classes")
       .select("*")
@@ -67,7 +81,20 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
     } else {
       setClasses(data || [])
     }
-    setLoading(false)
+  }
+
+  async function fetchLevels() {
+    const { data, error } = await supabase
+      .from("levels")
+      .select("*")
+      .eq("establishment_id", establishmentId)
+      .order("name")
+
+    if (error) {
+      console.error("[v0] Error fetching levels:", error)
+    } else {
+      setLevels(data || [])
+    }
   }
 
   async function handleAdd() {
@@ -75,6 +102,15 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
       toast({
         title: "Erreur",
         description: "Le nom de la classe est requis",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!formData.level) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un niveau",
         variant: "destructive",
       })
       return
@@ -195,6 +231,10 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
             {classes.length} classe{classes.length !== 1 ? "s" : ""} enregistrée{classes.length !== 1 ? "s" : ""}
           </p>
         </div>
+        <Button onClick={() => setIsLevelsDialogOpen(true)} variant="outline" size="lg">
+          <GraduationCap className="mr-2 h-5 w-5" />
+          Gestion des niveaux
+        </Button>
         <Button onClick={() => setIsAddDialogOpen(true)} size="lg" className="w-full sm:w-auto">
           <Plus className="mr-2 h-5 w-5" />
           Ajouter une classe
@@ -285,21 +325,32 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: 6ème A"
+                placeholder="Ex: 6A, 5B"
                 className="h-11"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="level" className="text-sm font-medium">
-                Niveau
+                Niveau <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="level"
-                value={formData.level}
-                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                placeholder="Ex: 6ème"
-                className="h-11"
-              />
+              <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Sélectionner un niveau" />
+                </SelectTrigger>
+                <SelectContent>
+                  {levels.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      Aucun niveau créé
+                    </SelectItem>
+                  ) : (
+                    levels.map((level) => (
+                      <SelectItem key={level.id} value={level.name}>
+                        {level.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -336,12 +387,24 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
               <Label htmlFor="edit-level" className="text-sm font-medium">
                 Niveau
               </Label>
-              <Input
-                id="edit-level"
-                value={formData.level}
-                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                className="h-11"
-              />
+              <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Sélectionner un niveau" />
+                </SelectTrigger>
+                <SelectContent>
+                  {levels.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      Aucun niveau créé
+                    </SelectItem>
+                  ) : (
+                    levels.map((level) => (
+                      <SelectItem key={level.id} value={level.name}>
+                        {level.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -355,6 +418,13 @@ export function ClassesManagement({ establishmentId, onBack }: ClassesManagement
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LevelsManagementDialog
+        open={isLevelsDialogOpen}
+        onOpenChange={setIsLevelsDialogOpen}
+        establishmentId={establishmentId}
+        onLevelsUpdated={fetchLevels}
+      />
     </div>
   )
 }

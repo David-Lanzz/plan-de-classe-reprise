@@ -173,62 +173,95 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
   const setAvailableOptions = async (supabase: any) => {
     console.log("[v0] setAvailableOptions called for role:", userRole, "userId:", userId)
 
+    if (userRole === "vie-scolaire") {
+      const { data: allTeachers, error: teachersError } = await supabase
+        .from("teachers")
+        .select("*")
+        .eq("establishment_id", establishmentId)
+
+      const { data: allClasses, error: classesError } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("establishment_id", establishmentId)
+
+      console.log("[v0] Vie scolaire - Teachers:", allTeachers?.length, "Classes:", allClasses?.length)
+
+      if (allTeachers) setAvailableTeachers(allTeachers)
+      if (allClasses) setAvailableClasses(allClasses)
+      return
+    }
+
+    // For teachers and delegates, find their record first
+    let currentUserRecord: any = null
+
     if (userRole === "professeur") {
-      const { data: teacherData } = await supabase.from("teachers").select("id").eq("profile_id", userId).maybeSingle()
-
-      console.log("[v0] Teacher lookup result:", teacherData)
-
-      if (teacherData) {
-        const { data: teacherClasses } = await supabase
-          .from("teacher_classes")
-          .select("class_id, classes(id, name)")
-          .eq("teacher_id", teacherData.id)
-
-        console.log("[v0] Teacher classes:", teacherClasses)
-
-        const myClasses = teacherClasses?.map((tc: any) => tc.classes) || []
-        setAvailableClasses(myClasses)
-
-        const myTeacher = teachers.find((t) => t.id === teacherData.id)
-        setAvailableTeachers(myTeacher ? [myTeacher] : [])
-      } else {
-        console.log("[v0] No teacher found with profile_id:", userId)
-        setAvailableClasses([])
-        setAvailableTeachers([])
-      }
-    } else if (userRole === "delegue" || userRole === "eco-delegue") {
-      const { data: studentData } = await supabase
-        .from("students")
-        .select("id, class_id")
+      const { data: teacherRecord, error } = await supabase
+        .from("teachers")
+        .select("*")
         .eq("profile_id", userId)
         .maybeSingle()
 
-      console.log("[v0] Student lookup result:", studentData)
+      console.log("[v0] Teacher record query result:", teacherRecord, "error:", error)
+      currentUserRecord = teacherRecord
+    } else if (userRole === "delegue" || userRole === "eco-delegue") {
+      const { data: studentRecord, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("profile_id", userId)
+        .maybeSingle()
 
-      if (studentData?.class_id) {
-        const { data: classTeachers } = await supabase
-          .from("teacher_classes")
-          .select("teacher_id, teachers(id, first_name, last_name, subject, allow_delegate_subrooms)")
-          .eq("class_id", studentData.class_id)
+      console.log("[v0] Student record query result:", studentRecord, "error:", error)
+      currentUserRecord = studentRecord
+    }
 
-        console.log("[v0] Class teachers:", classTeachers)
+    if (!currentUserRecord) {
+      console.log("[v0] No user record found, showing empty lists")
+      setAvailableTeachers([])
+      setAvailableClasses([])
+      return
+    }
 
-        const allowedTeachers =
-          classTeachers?.map((ct: any) => ct.teachers).filter((t: Teacher) => t.allow_delegate_subrooms === true) || []
+    // Get classes this user has access to
+    let classIds: string[] = []
 
-        setAvailableTeachers(allowedTeachers)
+    if (userRole === "professeur") {
+      const { data: teacherClasses } = await supabase
+        .from("teacher_classes")
+        .select("class_id")
+        .eq("teacher_id", currentUserRecord.id)
 
-        const myClass = classes.find((c) => c.id === studentData.class_id)
-        setAvailableClasses(myClass ? [myClass] : [])
-      } else {
-        console.log("[v0] No student found with profile_id:", userId)
-        setAvailableClasses([])
-        setAvailableTeachers([])
+      classIds = teacherClasses?.map((tc: any) => tc.class_id) || []
+      console.log("[v0] Teacher has access to classes:", classIds)
+    } else if (userRole === "delegue" || userRole === "eco-delegue") {
+      if (currentUserRecord.class_id) {
+        classIds = [currentUserRecord.class_id]
+        console.log("[v0] Delegate has access to class:", classIds)
       }
-    } else {
-      console.log("[v0] Vie scolaire: showing all teachers and classes")
-      setAvailableTeachers(teachers)
-      setAvailableClasses(classes)
+    }
+
+    // Load classes
+    if (classIds.length > 0) {
+      const { data: userClasses } = await supabase.from("classes").select("*").in("id", classIds)
+
+      console.log("[v0] User classes loaded:", userClasses?.length)
+      if (userClasses) setAvailableClasses(userClasses)
+    }
+
+    // Load teachers who teach these classes
+    if (classIds.length > 0) {
+      const { data: classTeachers } = await supabase
+        .from("teacher_classes")
+        .select("teacher_id")
+        .in("class_id", classIds)
+
+      const teacherIds = [...new Set(classTeachers?.map((tc: any) => tc.teacher_id) || [])]
+
+      if (teacherIds.length > 0) {
+        const { data: teachers } = await supabase.from("teachers").select("*").in("id", teacherIds)
+
+        console.log("[v0] Teachers loaded:", teachers?.length)
+        if (teachers) setAvailableTeachers(teachers)
+      }
     }
   }
 
@@ -566,56 +599,59 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
                     <SelectValue placeholder="Sélectionner un professeur" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableTeachers.map((teacher) => (
-                      <SelectItem key={teacher.id} value={teacher.id}>
-                        {teacher.first_name} {teacher.last_name} ({teacher.subject})
+                    {availableTeachers.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        Aucun professeur disponible
                       </SelectItem>
-                    ))}
+                    ) : (
+                      availableTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.first_name} {teacher.last_name} - {teacher.subject}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="multiClass"
-                    checked={formData.isMultiClass}
-                    onCheckedChange={(checked) => {
-                      const isMulti = checked as boolean
-                      setFormData({
-                        ...formData,
-                        isMultiClass: isMulti,
-                        classIds: isMulti ? formData.classIds : formData.classIds.slice(0, 1),
-                      })
-                    }}
-                  />
-                  <Label htmlFor="multiClass" className="cursor-pointer">
-                    Salle multi-classe
-                  </Label>
+                <div className="flex items-center justify-between">
+                  <Label>Classes</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="multi-class"
+                      checked={formData.isMultiClass}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          isMultiClass: checked as boolean,
+                          classIds: [],
+                        })
+                      }
+                    />
+                    <Label htmlFor="multi-class" className="text-sm font-normal cursor-pointer">
+                      Multi-classes
+                    </Label>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {formData.isMultiClass
-                    ? "Vous pouvez sélectionner plusieurs classes"
-                    : "Vous ne pouvez sélectionner qu'une seule classe"}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Classes</Label>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-                  {availableClasses.map((cls) => (
-                    <div key={cls.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`class-${cls.id}`}
-                        checked={formData.classIds.includes(cls.id)}
-                        onCheckedChange={() => handleToggleClass(cls.id)}
-                      />
-                      <Label htmlFor={`class-${cls.id}`} className="cursor-pointer text-sm">
-                        {cls.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                {availableClasses.length === 0 ? (
+                  <div className="text-sm text-muted-foreground border rounded-md p-4">Aucune classe disponible</div>
+                ) : (
+                  <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
+                    {availableClasses.map((cls) => (
+                      <div key={cls.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`class-${cls.id}`}
+                          checked={formData.classIds.includes(cls.id)}
+                          onCheckedChange={() => handleToggleClass(cls.id)}
+                        />
+                        <Label htmlFor={`class-${cls.id}`} className="text-sm font-normal cursor-pointer flex-1">
+                          {cls.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {showWarning && (
