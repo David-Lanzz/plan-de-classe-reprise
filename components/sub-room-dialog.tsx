@@ -210,23 +210,21 @@ export function SubRoomDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Créer une sous-salle</DialogTitle>
-          <DialogDescription>
-            Créez une version personnalisée de cette salle pour une période spécifique ou indéterminée
-          </DialogDescription>
+          <DialogDescription>Créez une configuration personnalisée de cette salle</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom de la sous-salle</Label>
+            <Label htmlFor="name">Nom de la sous-salle *</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="ex: Configuration examen"
+              placeholder="ex: Configuration examen du 15 janvier"
             />
           </div>
 
-          <div className="flex items-center space-x-2 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+          <div className="flex items-center space-x-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border-2 border-blue-200 dark:border-blue-800">
             <Checkbox
               id="collaborative"
               checked={isCollaborative}
@@ -237,53 +235,86 @@ export function SubRoomDialog({
                 }
               }}
             />
-            <Label htmlFor="collaborative" className="cursor-pointer">
-              <div className="font-medium">Salle collaborative</div>
-              <div className="text-sm text-muted-foreground">
-                Permet de sélectionner plusieurs professeurs et plusieurs classes
+            <Label htmlFor="collaborative" className="cursor-pointer flex-1">
+              <div className="font-semibold text-blue-900 dark:text-blue-100">
+                🤝 Salle collaborative multi-professeurs
+              </div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Cochez cette case pour permettre à plusieurs professeurs de gérer cette sous-salle ensemble
               </div>
             </Label>
           </div>
 
           <div className="space-y-2">
-            <Label>Professeur{isCollaborative ? "s" : ""}</Label>
-            <div className="border rounded-lg p-4 space-y-2 max-h-48 overflow-y-auto">
-              {availableTeachers.map((teacher) => (
-                <div key={teacher.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`teacher-${teacher.id}`}
-                    checked={selectedTeachers.includes(teacher.id)}
-                    onCheckedChange={() => handleTeacherToggle(teacher.id)}
-                  />
-                  <Label htmlFor={`teacher-${teacher.id}`} className="flex-1 cursor-pointer">
-                    {teacher.first_name} {teacher.last_name} - {teacher.subject}
-                  </Label>
-                </div>
-              ))}
+            <Label className="text-base font-semibold">👨‍🏫 Professeur{isCollaborative ? "s" : ""} *</Label>
+            <p className="text-sm text-muted-foreground">
+              {isCollaborative ? "Sélectionnez un ou plusieurs professeurs" : "Sélectionnez un seul professeur"}
+            </p>
+            <div className="border-2 rounded-lg p-4 space-y-2 max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+              {availableTeachers.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">Aucun professeur disponible</div>
+              ) : (
+                availableTeachers.map((teacher) => (
+                  <div
+                    key={teacher.id}
+                    className="flex items-center space-x-3 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors"
+                  >
+                    <Checkbox
+                      id={`teacher-${teacher.id}`}
+                      checked={selectedTeachers.includes(teacher.id)}
+                      onCheckedChange={() => handleTeacherToggle(teacher.id)}
+                    />
+                    <Label htmlFor={`teacher-${teacher.id}`} className="flex-1 cursor-pointer font-medium">
+                      {teacher.first_name} {teacher.last_name}
+                      <span className="text-sm text-muted-foreground ml-2">• {teacher.subject}</span>
+                    </Label>
+                  </div>
+                ))
+              )}
             </div>
             {selectedTeachers.length > 0 && (
-              <div className="text-sm text-muted-foreground">
-                {selectedTeachers.length} professeur{selectedTeachers.length > 1 ? "s" : ""} sélectionné
+              <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                ✓ {selectedTeachers.length} professeur{selectedTeachers.length > 1 ? "s" : ""} sélectionné
                 {selectedTeachers.length > 1 ? "s" : ""}
               </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Classe{isCollaborative || selectedClasses.length > 1 ? "s" : ""}</Label>
+            <Label className="text-base font-semibold">
+              📚 Classe{isCollaborative || selectedClasses.length > 1 ? "s" : ""} *
+            </Label>
             {selectedTeachers.length === 0 ? (
-              <div className="text-sm text-muted-foreground p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
-                📋 Veuillez d'abord sélectionner un ou plusieurs professeurs pour voir les classes disponibles
+              <div className="text-sm p-6 bg-amber-50 dark:bg-amber-950 rounded-lg border-2 border-amber-200 dark:border-amber-800 text-center">
+                <div className="text-4xl mb-2">👆</div>
+                <div className="font-medium text-amber-900 dark:text-amber-100">
+                  Veuillez d'abord sélectionner un ou plusieurs professeurs
+                </div>
+                <div className="text-amber-700 dark:text-amber-300 mt-1">
+                  Les classes disponibles dépendent des professeurs sélectionnés
+                </div>
               </div>
             ) : filteredClasses.length === 0 ? (
-              <div className="text-sm text-muted-foreground p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200">
-                ⚠️ Aucune classe n'est enseignée par {selectedTeachers.length > 1 ? "ces professeurs" : "ce professeur"}
+              <div className="text-sm p-6 bg-red-50 dark:bg-red-950 rounded-lg border-2 border-red-200 dark:border-red-800 text-center">
+                <div className="text-4xl mb-2">⚠️</div>
+                <div className="font-medium text-red-900 dark:text-red-100">Aucune classe disponible</div>
+                <div className="text-red-700 dark:text-red-300 mt-1">
+                  {selectedTeachers.length > 1 ? "Ces professeurs n'enseignent" : "Ce professeur n'enseigne"} à aucune
+                  classe
+                </div>
               </div>
             ) : (
               <>
-                <div className="border rounded-lg p-4 space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-sm text-muted-foreground">
+                  Seules les classes enseignées par{" "}
+                  {selectedTeachers.length > 1 ? "les professeurs sélectionnés" : "le professeur sélectionné"}
+                </p>
+                <div className="border-2 rounded-lg p-4 space-y-2 max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-900">
                   {filteredClasses.map((cls) => (
-                    <div key={cls.id} className="flex items-center space-x-2">
+                    <div
+                      key={cls.id}
+                      className="flex items-center space-x-3 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors"
+                    >
                       <Checkbox
                         id={`class-${cls.id}`}
                         checked={selectedClasses.includes(cls.id)}
@@ -292,21 +323,21 @@ export function SubRoomDialog({
                             if (isCollaborative) {
                               setSelectedClasses((prev) => [...prev, cls.id])
                             } else {
-                              setSelectedClasses([cls.id]) // Single selection if not collaborative
+                              setSelectedClasses([cls.id])
                             }
                           } else {
                             setSelectedClasses((prev) => prev.filter((id) => id !== cls.id))
                           }
                         }}
                       />
-                      <Label htmlFor={`class-${cls.id}`} className="flex-1 cursor-pointer">
+                      <Label htmlFor={`class-${cls.id}`} className="flex-1 cursor-pointer font-medium">
                         {cls.name}
                       </Label>
                     </div>
                   ))}
                 </div>
                 {selectedClasses.length > 0 && (
-                  <div className="text-sm text-green-600 dark:text-green-400">
+                  <div className="text-sm font-medium text-green-600 dark:text-green-400">
                     ✓ {selectedClasses.length} classe{selectedClasses.length > 1 ? "s" : ""} sélectionnée
                     {selectedClasses.length > 1 ? "s" : ""}
                   </div>

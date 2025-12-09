@@ -71,6 +71,8 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
   const [assignments, setAssignments] = useState<Map<number, string>>(new Map())
   const [savedAssignments, setSavedAssignments] = useState<Map<number, string>>(new Map())
   const [draggedStudent, setDraggedStudent] = useState<Student | null>(null)
+  const [touchedStudent, setTouchedStudent] = useState<Student | null>(null)
+  const [selectedSeatForDialog, setSelectedSeatForDialog] = useState<number | null>(null)
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -484,8 +486,8 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
       const newAssignments = new Map(assignments)
 
       // Remove from previous position
-      for (const [seat, studentId] of newAssignments.entries()) {
-        if (studentId === draggedStudent.id) {
+      for (const [seat, id] of newAssignments.entries()) {
+        if (id === draggedStudent.id) {
           newAssignments.delete(seat)
         }
       }
@@ -498,6 +500,28 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
     setIsDragging(false)
     setDraggedStudent(null)
     setTouchStartPos(null)
+  }
+
+  const handleSeatClick = (seatNumber: number) => {
+    setSelectedSeatForDialog(seatNumber)
+  }
+
+  const handleAssignStudentFromDialog = (studentId: string) => {
+    if (selectedSeatForDialog === null) return
+
+    const newAssignments = new Map(assignments)
+
+    // Remove student from any previous seat
+    for (const [seat, id] of newAssignments.entries()) {
+      if (id === studentId) {
+        newAssignments.delete(seat)
+      }
+    }
+
+    // Assign to selected seat
+    newAssignments.set(selectedSeatForDialog, studentId)
+    setAssignments(newAssignments)
+    setSelectedSeatForDialog(null)
   }
 
   const getTableStyle = () => {
@@ -556,9 +580,9 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
 
     const cols = room.config.columns.length
 
-    if (cols <= 2) return "w-48 h-36 sm:w-56 sm:h-40" // Larger for 2 columns
-    if (cols <= 4) return "w-36 h-28 sm:w-40 sm:h-32" // Medium for 3-4 columns
-    return "w-32 h-24 sm:w-36 sm:h-28" // Compact for 5+ columns
+    if (cols <= 2) return "w-72" // Large tables for 2 columns
+    if (cols <= 4) return "w-56" // Medium tables for 3-4 columns
+    return "w-48" // Small tables for 5+ columns
   }
 
   const getResponsiveSeatSize = () => {
@@ -566,9 +590,9 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
 
     const cols = room.config.columns.length
 
-    if (cols <= 2) return "w-16 h-16 sm:w-20 sm:h-20" // Larger seats for 2 columns
-    if (cols <= 4) return "w-14 h-14 sm:w-16 sm:h-16" // Medium seats
-    return "w-12 h-12 sm:w-14 sm:h-14" // Compact seats for many columns
+    if (cols <= 2) return "w-20 h-20" // Large seats
+    if (cols <= 4) return "w-16 h-16" // Medium seats
+    return "w-14 h-14" // Small seats
   }
 
   const getResponsiveGap = () => {
@@ -770,21 +794,21 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
 
                                 return (
                                   <div
-                                    key={seatIndex}
+                                    key={`seat-${tableIndex}-${seatIndex}`}
                                     data-seat-number={seatNumber}
-                                    className={`${getResponsiveSeatSize()} rounded border-2 flex items-center justify-center text-xs font-medium cursor-pointer transition-all hover:scale-105 relative group`}
-                                    style={{
-                                      backgroundColor: isOccupied ? "#000000" : "#E5E7EB",
-                                      borderColor: isOccupied ? "#000000" : "#D1D5DB",
-                                      color: isOccupied ? "#FFFFFF" : "#9CA3AF",
-                                    }}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, seatNumber)}
-                                    draggable={isOccupied}
-                                    onDragStart={() => student && handleDragStart(student)}
-                                    onTouchStart={(e) => student && handleTouchStart(e, student)}
-                                    onTouchMove={handleTouchMove}
                                     onTouchEnd={(e) => handleTouchEnd(e, seatNumber)}
+                                    onClick={() => !student && handleSeatClick(seatNumber)}
+                                    className={`
+                                      aspect-square rounded-lg border-2 flex items-center justify-center relative
+                                      transition-all
+                                      ${
+                                        student
+                                          ? "bg-black dark:bg-white border-black dark:border-white cursor-move hover:shadow-lg"
+                                          : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                                      }
+                                    `}
                                   >
                                     {student ? (
                                       <>
@@ -938,6 +962,46 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                   Générer un lien
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog for student selection */}
+        <Dialog open={selectedSeatForDialog !== null} onOpenChange={(open) => !open && setSelectedSeatForDialog(null)}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Sélectionner un élève</DialogTitle>
+              <DialogDescription>Choisissez un élève à placer sur la place {selectedSeatForDialog}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 mt-4">
+              {getUnassignedStudents().map((student) => (
+                <Button
+                  key={student.id}
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3 bg-transparent"
+                  onClick={() => handleAssignStudentFromDialog(student.id)}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <div className="font-medium">
+                      {student.last_name} {student.first_name}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {student.class_name}
+                      </Badge>
+                      {student.role === "delegue" && <Badge className="text-xs bg-blue-500 text-white">Délégué</Badge>}
+                      {student.role === "eco-delegue" && (
+                        <Badge className="text-xs bg-emerald-500 text-white">Éco-délégué</Badge>
+                      )}
+                    </div>
+                  </div>
+                </Button>
+              ))}
+              {getUnassignedStudents().length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Tous les élèves sont déjà placés</p>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
