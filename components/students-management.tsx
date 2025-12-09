@@ -169,15 +169,21 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
     let studentsResult
 
     if (userRole === "professeur") {
-      // First, find the teacher record using profile_id
       const { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
         .select("id")
         .eq("profile_id", userId)
-        .single()
+        .maybeSingle()
 
-      if (teacherError || !teacherData) {
+      if (teacherError) {
         console.error("[v0] Error fetching teacher record:", teacherError)
+        setStudents([])
+        setLoading(false)
+        return
+      }
+
+      if (!teacherData) {
+        console.log("[v0] No teacher record found for profile_id:", userId)
         setStudents([])
         setLoading(false)
         return
@@ -215,15 +221,21 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
         .in("class_id", classIds)
         .order("last_name")
     } else if (userRole === "delegue" || userRole === "eco-delegue") {
-      // First, find the student record using profile_id
       const { data: studentData, error: studentError } = await supabase
         .from("students")
         .select("class_id")
         .eq("profile_id", userId)
-        .single()
+        .maybeSingle()
 
-      if (studentError || !studentData?.class_id) {
+      if (studentError) {
         console.error("[v0] Error fetching student record:", studentError)
+        setStudents([])
+        setLoading(false)
+        return
+      }
+
+      if (!studentData?.class_id) {
+        console.log("[v0] No student record found for profile_id:", userId)
         setStudents([])
         setLoading(false)
         return

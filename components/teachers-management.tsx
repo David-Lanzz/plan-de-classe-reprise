@@ -141,15 +141,20 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
     let teachersResult
 
     if (userRole === "professeur") {
-      // First, find the teacher record using profile_id
       const { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
         .select("id")
         .eq("profile_id", userId)
-        .single()
+        .maybeSingle()
 
-      if (teacherError || !teacherData) {
+      if (teacherError) {
         console.error("[v0] Error fetching teacher record:", teacherError)
+        setTeachers([])
+        return
+      }
+
+      if (!teacherData) {
+        console.log("[v0] No teacher record found for profile_id:", userId)
         setTeachers([])
         return
       }
@@ -195,15 +200,20 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
         .in("id", teacherIds)
         .order("last_name")
     } else if (userRole === "delegue" || userRole === "eco-delegue") {
-      // First, find the student record using profile_id
       const { data: studentData, error: studentError } = await supabase
         .from("students")
         .select("class_id")
         .eq("profile_id", userId)
-        .single()
+        .maybeSingle()
 
-      if (studentError || !studentData?.class_id) {
+      if (studentError) {
         console.error("[v0] Error fetching student record:", studentError)
+        setTeachers([])
+        return
+      }
+
+      if (!studentData?.class_id) {
+        console.log("[v0] No student record found for profile_id:", userId)
         setTeachers([])
         return
       }
@@ -797,7 +807,11 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
       const supabase = createClient()
 
       // Get the student's class
-      const { data: studentData, error } = await supabase.from("students").select("class_id").eq("id", userId).single()
+      const { data: studentData, error } = await supabase
+        .from("students")
+        .select("class_id")
+        .eq("profile_id", userId)
+        .single()
 
       if (!error && studentData) {
         const ppTeachers = new Set<string>()
