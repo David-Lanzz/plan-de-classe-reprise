@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { AlertTriangle } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 
 interface Teacher {
   id: string
@@ -61,7 +60,6 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
   })
 
   const supabase = createClient()
-  const { toast } = useToast()
 
   useEffect(() => {
     if (open) {
@@ -171,11 +169,6 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
 
   const handleCreate = async () => {
     if (!formData.roomId || formData.selectedTeachers.length === 0 || formData.selectedClasses.length === 0) {
-      toast({
-        title: "Champs manquants",
-        description: "Veuillez remplir tous les champs obligatoires",
-        variant: "destructive",
-      })
       return
     }
 
@@ -186,14 +179,6 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
 
       const defaultName = `${selectedRoom?.name || "Salle"} - ${firstTeacher?.last_name || "Prof"}`
 
-      console.log("[v0] Creating sub-room with data:", {
-        room_id: formData.roomId,
-        name: formData.customName || defaultName,
-        teacher_id: formData.selectedTeachers[0],
-        establishment_id: establishmentId,
-        class_ids: formData.selectedClasses,
-      })
-
       const { data: subRoom, error: subRoomError } = await supabase
         .from("sub_rooms")
         .insert({
@@ -202,24 +187,17 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
           custom_name: formData.customName || null,
           teacher_id: formData.selectedTeachers[0],
           establishment_id: establishmentId,
-          class_ids: formData.selectedClasses,
-          is_multi_class: formData.isMultiClass,
+          class_ids: formData.selectedClasses, // Store classes directly as array
         })
         .select()
         .single()
 
       if (subRoomError) {
         console.error("[v0] Error creating sub-room:", subRoomError)
-        toast({
-          title: "Échec de la création",
-          description: `Erreur: ${subRoomError.message}${subRoomError.hint ? ` (${subRoomError.hint})` : ""}`,
-          variant: "destructive",
-        })
-        setIsLoading(false)
-        return
+        throw subRoomError
       }
 
-      console.log("[v0] Sub-room created successfully:", subRoom.id)
+      console.log("[v0] Sub-room created successfully:", subRoom)
 
       if (formData.isCollaborative && formData.selectedTeachers.length > 0) {
         const teacherLinks = formData.selectedTeachers.map((teacherId) => ({
@@ -230,21 +208,10 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
         const { error: teachersError } = await supabase.from("sub_room_teachers").insert(teacherLinks)
 
         if (teachersError) {
-          console.error("[v0] Error linking teachers:", teachersError)
-          toast({
-            title: "Attention",
-            description: `Les professeurs n'ont pas pu être ajoutés: ${teachersError.message}`,
-            variant: "destructive",
-          })
-        } else {
-          console.log("[v0] Teachers linked successfully")
+          console.error("[v0] Error adding teachers:", teachersError)
+          throw teachersError
         }
       }
-
-      toast({
-        title: "Sous-salle créée avec succès",
-        description: `"${formData.customName || defaultName}" est maintenant disponible`,
-      })
 
       setFormData({
         roomId: "",
@@ -256,18 +223,15 @@ export function CreateSubRoomDialog({ open, onOpenChange, onSuccess, establishme
       })
 
       onOpenChange(false)
+      onSuccess()
 
+      // Force page reload after short delay
       setTimeout(() => {
-        console.log("[v0] Reloading page to show new sub-room")
         window.location.reload()
       }, 500)
-    } catch (error: any) {
-      console.error("[v0] Unexpected error creating sub-room:", error)
-      toast({
-        title: "Erreur inattendue",
-        description: error?.message || "Une erreur est survenue lors de la création",
-        variant: "destructive",
-      })
+    } catch (error) {
+      console.error("[v0] Error creating sub-room:", error)
+      alert("Erreur lors de la création de la sous-salle. Veuillez réessayer.")
     } finally {
       setIsLoading(false)
     }

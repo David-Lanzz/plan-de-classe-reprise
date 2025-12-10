@@ -4,10 +4,12 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +33,11 @@ import {
   Mail,
   Download,
   Link2,
+  CheckCircle2,
   User,
-  Loader2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import cn from "classnames"
-import { Search } from "lucide-react"
 
 interface Student {
   id: string
@@ -44,7 +45,6 @@ interface Student {
   last_name: string
   class_name: string
   role: string
-  gender?: string
 }
 
 interface Room {
@@ -75,15 +75,19 @@ interface SeatAssignment {
 
 interface SeatingPlanEditorProps {
   subRoom: SubRoom
-  room: Room
+  room?: Room
+  onClose?: () => void
   onBack?: () => void
 }
 
-export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorProps) {
+export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack }: SeatingPlanEditorProps) {
   const [students, setStudents] = useState<Student[]>([])
   const [assignments, setAssignments] = useState<Map<number, string>>(new Map())
   const [savedAssignments, setSavedAssignments] = useState<Map<number, string>>(new Map())
+  const [room, setRoom] = useState<Room | null>(initialRoom || null)
+  // Changed draggedStudent to string | null to store only studentId
   const [draggedStudent, setDraggedStudent] = useState<string | null>(null)
+  // Added state for dragging over the unplaced students area
   const [isDragOverUnplaced, setIsDragOverUnplaced] = useState(false)
   const [selectedSeatForDialog, setSelectedSeatForDialog] = useState<number | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -91,36 +95,61 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
   const [shareEmail, setShareEmail] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [completeMethod, setCompleteMethod] = useState<"random" | "asc" | "desc">("random")
+  // Simplified confirmation state
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false)
+  // Changed studentToRemove to store only studentId
   const [studentToRemove, setStudentToRemove] = useState<string | null>(null)
+  // Renamed dontShowRemoveAgain to dontShowAgain for consistency
   const [dontShowAgain, setDontShowAgain] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all")
 
   useEffect(() => {
     fetchData()
     const dontShow = localStorage.getItem("dontShowRemoveConfirmation")
     setDontShowAgain(dontShow === "true")
-  }, [subRoom.id])
+  }, [subRoom.id]) // Watch subRoom.id for changes
 
   const fetchData = async () => {
     const supabase = createClient()
 
-    console.log("[v0] Editor: Fetching students and assignments for sub-room:", subRoom.id)
-    console.log("[v0] Editor: Class IDs:", subRoom.class_ids)
+    console.log("[v0] Fetching data for sub-room:", subRoom.id)
+    console.log("[v0] Sub-room class_ids:", subRoom.class_ids)
+
+    if (!room) {
+      const { data: roomData } = await supabase.from("rooms").select("*").eq("id", subRoom.room_id).single()
+
+      if (roomData) {
+        setRoom(roomData)
+        console.log("[v0] Room loaded:", roomData.name)
+      } else {
+        console.error("[v0] Room not found for sub_room:", subRoom.room_id)
+        return
+      }
+    }
+
+    if (!subRoom.class_ids || subRoom.class_ids.length === 0) {
+      console.warn("[v0] No class_ids found for this sub-room")
+      setStudents([])
+      return
+    }
 
     const { data: studentsData, error: studentsError } = await supabase
       .from("students")
-      .select("id, first_name, last_name, class_name, role, gender")
+      .select("id, first_name, last_name, class_name, role")
       .in("class_id", subRoom.class_ids)
       .order("last_name")
 
-    console.log("[v0] Editor: Students data:", studentsData)
-    console.log("[v0] Editor: Students error:", studentsError)
-    console.log("[v0] Editor: Number of students found:", studentsData?.length || 0)
+    if (studentsError) {
+      console.error("[v0] Error fetching students:", studentsError)
+    }
 
-    if (studentsData) setStudents(studentsData)
+    if (studentsData) {
+      console.log("[v0] Students loaded:", studentsData.length)
+      setStudents(studentsData)
+    } else {
+      setStudents([])
+    }
 
+    // Fetch existing seat assignments
     const { data: assignmentsData } = await supabase
       .from("seating_assignments")
       .select("student_id, seat_position")
@@ -133,11 +162,12 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       })
       setAssignments(assignmentMap)
       setSavedAssignments(new Map(assignmentMap))
+      console.log("[v0] Loaded", assignmentsData.length, "seat assignments")
     }
   }
 
   const getTotalSeats = () => {
-    if (!room?.config?.columns) return 0
+    if (!room) return 0
     return room.config.columns.reduce((total, col) => total + col.tables * col.seatsPerTable, 0)
   }
 
@@ -146,14 +176,10 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     return students.filter((s) => !assignedIds.has(s.id))
   }
 
-  const handleDragStart = (e: React.DragEvent | React.TouchEvent | null, studentId: string) => {
-    if (e && "dataTransfer" in e) {
-      const event = e as React.DragEvent
-      setDraggedStudent(studentId)
-      event.dataTransfer.setData("studentId", studentId)
-    } else {
-      setDraggedStudent(studentId)
-      setIsDragging(true)
+  const handleDragStart = (e: React.DragEvent | null, studentId: string) => {
+    setDraggedStudent(studentId)
+    if (e) {
+      e.dataTransfer.setData("studentId", studentId)
     }
   }
 
@@ -173,11 +199,13 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     const newAssignments = new Map(assignments)
     const currentStudentId = newAssignments.get(seatNumber)
 
+    // If the seat is already occupied by the same student, do nothing
     if (currentStudentId === studentId) {
       setDraggedStudent(null)
       return
     }
 
+    // Find the current seat of the dragged student
     let draggedStudentCurrentSeat: number | null = null
     for (const [seat, id] of newAssignments.entries()) {
       if (id === studentId) {
@@ -186,12 +214,14 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       }
     }
 
+    // If the seat is occupied by another student, swap them
     if (currentStudentId) {
       if (draggedStudentCurrentSeat !== null) {
         newAssignments.set(draggedStudentCurrentSeat, currentStudentId)
       }
       newAssignments.set(seatNumber, studentId)
     } else {
+      // If the seat is empty, just place the student
       if (draggedStudentCurrentSeat !== null) {
         newAssignments.delete(draggedStudentCurrentSeat)
       }
@@ -202,30 +232,43 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     setDraggedStudent(null)
   }
 
-  const handleSeatClick = (seatNumber: number, studentId?: string) => {
-    const student = studentId ? students.find((s) => s.id === studentId) : undefined
-
-    if (student) {
+  const handleSeatClick = (seatNumber: number) => {
+    const studentId = assignments.get(seatNumber)
+    if (studentId) {
+      // Check if user has disabled confirmation
       const dontShow = localStorage.getItem("dontShowRemoveConfirmation") === "true"
       if (dontShow) {
-        removeStudentFromSeat(seatNumber)
+        // Remove directly
+        const newAssignments = new Map(assignments)
+        newAssignments.delete(seatNumber)
+        setAssignments(newAssignments)
+        toast({
+          title: "Élève retiré",
+          description: "L'élève a été retiré du plan de classe",
+        })
       } else {
+        // Show confirmation dialog
         setStudentToRemove(studentId)
         setShowRemoveConfirmation(true)
       }
     } else {
+      // If seat is empty, show student selection dialog
       setSelectedSeatForDialog(seatNumber)
     }
   }
 
   const handleConfirmRemove = () => {
     if (studentToRemove) {
+      // Find the seat with this student
       const seatNumber = Array.from(assignments.entries()).find(([_, id]) => id === studentToRemove)?.[0]
       if (seatNumber !== undefined) {
-        removeStudentFromSeat(seatNumber)
+        const newAssignments = new Map(assignments)
+        newAssignments.delete(seatNumber)
+        setAssignments(newAssignments)
       }
     }
 
+    // Save preference if checkbox was checked
     if (dontShowAgain) {
       localStorage.setItem("dontShowRemoveConfirmation", "true")
     }
@@ -245,21 +288,20 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     setDontShowAgain(false)
   }
 
-  const removeStudentFromSeat = (seatNumber: number) => {
+  const handleRemoveFromSeat = (seatNumber: number) => {
     const newAssignments = new Map(assignments)
     newAssignments.delete(seatNumber)
     setAssignments(newAssignments)
-    toast({
-      title: "Élève retiré",
-      description: "L'élève a été retiré du plan de classe",
-    })
   }
 
   const handleRandomPlacementAll = () => {
     const totalSeats = getTotalSeats()
     const availableSeats = Array.from({ length: totalSeats }, (_, i) => i + 1)
 
+    // Shuffle seats randomly
     const shuffledSeats = availableSeats.sort(() => Math.random() - 0.5)
+
+    // Shuffle students randomly
     const shuffledStudents = [...students].sort(() => Math.random() - 0.5)
 
     const newAssignments = new Map<number, string>()
@@ -361,6 +403,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       console.log("[v0] Saving seating plan for sub-room:", subRoom.id)
       console.log("[v0] Number of assignments:", assignments.size)
 
+      // Delete existing assignments
       const { error: deleteError } = await supabase.from("seating_assignments").delete().eq("sub_room_id", subRoom.id)
 
       if (deleteError) {
@@ -371,7 +414,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       const assignmentsToInsert = Array.from(assignments.entries()).map(([seatNumber, studentId]) => ({
         sub_room_id: subRoom.id,
         student_id: studentId,
-        seat_position: seatNumber,
+        seat_position: seatNumber, // Just the seat number as integer
       }))
 
       console.log("[v0] Assignments to insert:", assignmentsToInsert)
@@ -426,6 +469,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     }
 
     try {
+      // TODO: Implement actual email sending with Resend
       toast({
         title: "Email envoyé",
         description: `Le plan de classe a été envoyé à ${shareEmail}`,
@@ -443,6 +487,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
 
   const handleDownloadImage = () => {
     try {
+      // Create a simple text representation for now
       const canvas = document.createElement("canvas")
       const ctx = canvas.getContext("2d")
       if (!ctx) return
@@ -455,6 +500,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       ctx.font = "20px Arial"
       ctx.fillText(subRoom.name, 50, 50)
 
+      // Download
       const link = document.createElement("a")
       link.download = `plan-de-classe-${subRoom.name}.png`
       link.href = canvas.toDataURL()
@@ -478,6 +524,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       title: "PDF en cours de génération",
       description: "Le téléchargement va commencer...",
     })
+    // For now, just download as text
     const content = `Plan de Classe: ${subRoom.name}\n\nÉlèves placés:\n${Array.from(assignments.entries())
       .map(([seat, studentId]) => {
         const student = students.find((s) => s.id === studentId)
@@ -508,10 +555,14 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     }
   }
 
+  // Modified touch handlers to use studentId
   const handleTouchStart = (e: React.TouchEvent, studentId: string) => {
     const touch = e.touches[0]
     setDraggedStudent(studentId)
     setIsDragging(true)
+    // Optionally set dataTransfer for drag events compatibility if needed
+    // e.currentTarget.ondragstart = (event) => handleDragStart(event as any, studentId);
+    // e.currentTarget.dispatchEvent(new DragEvent('dragstart', { bubbles: true }));
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -531,6 +582,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
 
     let seatNumber = targetSeatNumber
 
+    // Try to find seat number from the element
     if (!seatNumber && element) {
       const seatDiv = element.closest("[data-seat-number]") as HTMLElement
       if (seatDiv) {
@@ -550,12 +602,14 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
         return
       }
 
+      // Remove from previous position
       for (const [seat, id] of newAssignments.entries()) {
         if (id === draggedStudent) {
           newAssignments.delete(seat)
         }
       }
 
+      // Assign to new seat
       newAssignments.set(seatNumber, draggedStudent)
       setAssignments(newAssignments)
     }
@@ -564,417 +618,683 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     setDraggedStudent(null)
   }
 
+  // Simplified handleSeatClick to trigger dialog or direct removal
+  const handleSeatClickOriginal = (seatNumber: number, student: Student | undefined) => {
+    if (student) {
+      // Check if user disabled confirmation
+      const dontShow = localStorage.getItem("dontShowRemoveConfirmation") === "true"
+
+      if (dontShow) {
+        // Remove directly without confirmation
+        removeStudentFromSeat(seatNumber)
+      } else {
+        // Show confirmation dialog
+        setStudentToRemove(student.id)
+        setShowRemoveConfirmation(true)
+      }
+    } else {
+      // If seat is empty, show student selection dialog
+      setSelectedSeatForDialog(seatNumber)
+    }
+  }
+
+  const removeStudentFromSeat = (seatNumber: number) => {
+    const newAssignments = new Map(assignments)
+    newAssignments.delete(seatNumber)
+    setAssignments(newAssignments)
+    toast({
+      title: "Élève retiré",
+      description: "L'élève a été retiré du plan de classe",
+    })
+  }
+
+  const confirmRemoveStudent = () => {
+    if (studentToRemove) {
+      // Find the seat number associated with studentToRemove
+      let seatNumberToRemove: number | undefined = undefined
+      for (const [seat, studentId] of assignments.entries()) {
+        if (studentId === studentToRemove) {
+          seatNumberToRemove = seat
+          break
+        }
+      }
+
+      if (seatNumberToRemove !== undefined) {
+        removeStudentFromSeat(seatNumberToRemove)
+      }
+
+      // Save "don't show again" preference
+      if (dontShowAgain) {
+        localStorage.setItem("dontShowRemoveConfirmation", "true")
+      }
+
+      setShowRemoveConfirmation(false)
+      setStudentToRemove(null)
+      setDontShowAgain(false)
+    }
+  }
+
+  const getTableStyle = () => {
+    return {
+      backgroundColor: "#FFFFFF", // White tables
+      borderColor: "#000000", // Black border
+    }
+  }
+
+  const getResponsiveTableSize = () => {
+    if (!room?.config?.columns) return "w-36 h-26"
+    const cols = room.config.columns.length
+
+    if (cols <= 2) return "w-36 h-26"
+    if (cols <= 4) return "w-32 h-24"
+    return "w-28 h-22"
+  }
+
+  const getResponsiveSeatSize = () => {
+    if (!room?.config?.columns) return "w-10 h-10"
+    const cols = room.config.columns.length
+
+    // Places plus petites et carrées
+    if (cols <= 2) return "w-10 h-10"
+    if (cols <= 4) return "w-9 h-9"
+    return "w-8 h-8"
+  }
+
+  const getResponsiveGap = () => {
+    if (!room?.config?.columns) return "gap-6 md:gap-8"
+    const columnCount = room.config.columns.length
+
+    if (columnCount <= 2) return "gap-6 md:gap-8"
+    if (columnCount <= 4) return "gap-4 md:gap-6"
+    return "gap-3 md:gap-4"
+  }
+
+  const getSeatStyle = (isOccupied: boolean) => {
+    if (isOccupied) {
+      return {
+        backgroundColor: "#000000", // Black for students assigned
+        borderColor: "#000000",
+        color: "#FFFFFF", // White text
+      }
+    }
+    return {
+      backgroundColor: "#E5E7EB", // Light gray for empty seats
+      borderColor: "#D1D5DB",
+      color: "#9CA3AF", // Seat numbers in gray
+    }
+  }
+
+  const getBoardAlignment = () => {
+    switch (room?.board_position) {
+      case "top":
+        return "justify-center items-start"
+      case "bottom":
+        return "justify-center items-end"
+      case "left":
+        return "justify-start items-center"
+      case "right":
+        return "justify-end items-center"
+      default:
+        return ""
+    }
+  }
+
+  const getSeatNumber = (colIndex: number, tableIndex: number, seatIndex: number) => {
+    if (!room?.config?.columns) return 0
+
+    let seatNumber = 0
+    // Count all seats in previous columns
+    for (let i = 0; i < colIndex; i++) {
+      seatNumber += room.config.columns[i].tables * room.config.columns[i].seatsPerTable
+    }
+    // Count all seats in previous tables of current column
+    seatNumber += tableIndex * room.config.columns[colIndex].seatsPerTable
+    // Add current seat index (+1 to start at 1)
+    seatNumber += seatIndex + 1
+    return seatNumber
+  }
+
+  // Renamed function to better reflect its purpose
+  const handleDropToUnplacedArea = () => {
+    if (draggedStudent) {
+      console.log("[v0] Removing student from seat:", draggedStudent)
+
+      // Find and remove the student from their current seat
+      const entries = Array.from(assignments.entries())
+      const entry = entries.find(([_, studentId]) => studentId === draggedStudent)
+
+      if (entry) {
+        const [seatNumber] = entry
+        const newAssignments = new Map(assignments)
+        newAssignments.delete(seatNumber)
+        setAssignments(newAssignments)
+
+        toast({
+          title: "Élève retiré",
+          description: `${students.find((s) => s.id === draggedStudent)?.first_name} ${students.find((s) => s.id === draggedStudent)?.last_name} a été retiré de la place ${seatNumber}`,
+        })
+      }
+
+      setDraggedStudent(null)
+    }
+  }
+
+  // Helper to get student initials
   const getInitials = (student: Student) => {
     return `${student.last_name.charAt(0)}.${student.first_name.charAt(0)}`.toUpperCase()
   }
 
-  const calculateSeatNumber = (colIndex: number, tableIndex: number, seatIndex: number) => {
-    if (!room) return 0
-    let seatNumber = 0
-    for (let i = 0; i < colIndex; i++) {
-      seatNumber += room.config.columns[i].tables * room.config.columns[i].seatsPerTable
-    }
-    seatNumber += tableIndex * room.config.columns[colIndex].seatsPerTable + seatIndex + 1
-    return seatNumber
-  }
-
-  const getFilteredUnassignedStudents = () => {
-    let filtered = getUnassignedStudents()
-
-    // Search filter
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (s) =>
-          s.first_name.toLowerCase().includes(term) ||
-          s.last_name.toLowerCase().includes(term) ||
-          s.class_name?.toLowerCase().includes(term),
-      )
-    }
-
-    // Gender filter
-    if (genderFilter !== "all") {
-      filtered = filtered.filter((s) => s.gender === genderFilter)
-    }
-
-    return filtered
+  if (!room) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Chargement de la salle...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
-      <div className="border-b bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 bg-white dark:bg-slate-950 z-50 overflow-y-auto">
+      <div className="p-6 w-full">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack || onClose}
+              className="hover:bg-gray-100 dark:hover:bg-gray-900"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{subRoom.name}</h1>
-              <p className="text-sm text-muted-foreground">
-                {room.name} - {students.length} élève(s)
+              <h1 className="text-3xl font-bold text-black dark:text-white">{subRoom.name}</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {room.name} ({room.code}) • {students.length} élève(s) • {getTotalSeats()} place(s)
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleReset}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Réinitialiser
-            </Button>
-            <Button variant="outline" onClick={() => setIsShareDialogOpen(true)}>
-              <Share2 className="mr-2 h-4 w-4" />
-              Partager
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sauvegarde...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Sauvegarder
-                </>
-              )}
-            </Button>
-          </div>
         </div>
-      </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left column - Students list with filters */}
-        <div className="w-80 border-r bg-white p-6 overflow-y-auto">
-          <h2 className="mb-4 text-lg font-semibold">
-            Élèves non placés ({getFilteredUnassignedStudents().length}/{getUnassignedStudents().length})
-          </h2>
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left Panel - Options */}
+          <div className="col-span-2">
+            <Card className="sticky top-6 border-gray-200 dark:border-gray-800">
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold text-sm mb-4 text-black dark:text-white">Options</h3>
 
-          <div className="mb-4 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Rechercher un élève..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant={genderFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setGenderFilter("all")}
-                className="flex-1"
-              >
-                Tous
-              </Button>
-              <Button
-                variant={genderFilter === "M" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setGenderFilter("M")}
-                className="flex-1"
-              >
-                Garçons
-              </Button>
-              <Button
-                variant={genderFilter === "F" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setGenderFilter("F")}
-                className="flex-1"
-              >
-                Filles
-              </Button>
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              "mb-4 rounded-lg border-2 border-dashed p-4 transition-all",
-              isDragOverUnplaced ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-gray-50",
-            )}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setIsDragOverUnplaced(true)
-            }}
-            onDragLeave={() => setIsDragOverUnplaced(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setIsDragOverUnplaced(false)
-              const studentId = e.dataTransfer.getData("studentId")
-              if (studentId) {
-                const newAssignments = new Map(assignments)
-                for (const [seat, id] of newAssignments.entries()) {
-                  if (id === studentId) {
-                    newAssignments.delete(seat)
-                    break
-                  }
-                }
-                setAssignments(newAssignments)
-                toast({
-                  title: "Élève retiré",
-                  description: "L'élève a été retiré du plan",
-                })
-              }
-            }}
-          >
-            <p className="text-center text-sm text-muted-foreground">
-              {isDragOverUnplaced ? "Déposez ici pour retirer du plan" : "Glissez un élève ici pour le retirer"}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            {getFilteredUnassignedStudents().length === 0 ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                {searchTerm || genderFilter !== "all"
-                  ? "Aucun élève ne correspond aux filtres"
-                  : "Tous les élèves sont placés"}
-              </div>
-            ) : (
-              getFilteredUnassignedStudents().map((student) => (
-                <div
-                  key={student.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, student.id)}
-                  className="flex cursor-move items-center justify-between rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-shadow relative"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                  onClick={handleRandomPlacementAll}
                 >
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-medium">
-                      {student.last_name} {student.first_name}
-                    </span>
+                  <Shuffle className="mr-2 h-4 w-4" />
+                  Aléatoire
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                  onClick={() => handleAlphabeticalPlacement("asc")}
+                >
+                  <ArrowDownAZ className="mr-2 h-4 w-4" />A → Z
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                  onClick={() => handleAlphabeticalPlacement("desc")}
+                >
+                  <ArrowUpAZ className="mr-2 h-4 w-4" />Z → A
+                </Button>
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400 mb-2 block">Compléter le plan</Label>
+                  <div key="complete-method-select">
+                    <Select value={completeMethod} onValueChange={(value: any) => setCompleteMethod(value)}>
+                      <SelectTrigger className="w-full border-gray-300 dark:border-gray-700 bg-transparent">
+                        <SelectValue placeholder="Méthode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem key="complete-random" value="random">
+                          Aléatoire
+                        </SelectItem>
+                        <SelectItem key="complete-asc" value="asc">
+                          A → Z
+                        </SelectItem>
+                        <SelectItem key="complete-desc" value="desc">
+                          Z → A
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {student.class_name}
-                    </Badge>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2 justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                    onClick={handleCompletePlan}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Compléter
+                  </Button>
                 </div>
-              ))
-            )}
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                  <Button
+                    size="sm"
+                    className="w-full justify-start bg-green-400 hover:bg-green-500 text-white"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {isSaving ? "Sauvegarde..." : "Sauvegarder"}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="w-full justify-start bg-red-400 hover:bg-red-500 text-white"
+                    onClick={handleRemoveAll}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Tout retirer
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                    onClick={handleReset}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Réinitialiser
+                  </Button>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                    onClick={() => setIsShareDialogOpen(true)}
+                  >
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Partager
+                  </Button>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full justify-start bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black"
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Valider
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
 
-        {/* Center column - Seating plan editor */}
-        <div className="flex-1 overflow-auto p-8">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-6 rounded-lg border-2 border-green-600 bg-green-50 p-4 text-center">
-              <p className="font-semibold text-green-800">TABLEAU</p>
-            </div>
-
-            <div className={cn("grid gap-8", `grid-cols-${room.config.columns.length}`)}>
-              {room.config.columns.map((column, colIndex) => (
-                <div key={column.id} className="space-y-6">
-                  {Array.from({ length: column.tables }).map((_, tableIndex) => (
-                    <div
-                      key={tableIndex}
-                      className="rounded-lg border-2 border-black bg-white p-4 shadow-sm"
-                      style={{
-                        width: "fit-content",
-                      }}
-                    >
-                      <div className={cn("grid gap-2", `grid-cols-${column.seatsPerTable}`)}>
-                        {Array.from({ length: column.seatsPerTable }).map((_, seatIndex) => {
-                          const seatNumber = calculateSeatNumber(colIndex, tableIndex, seatIndex)
-                          const studentId = assignments.get(seatNumber)
-                          const student = studentId ? students.find((s) => s.id === studentId) : undefined
-
-                          return (
+          {/* Center - Room Layout */}
+          <div className="col-span-8">
+            <Card className="border-gray-200 dark:border-gray-800">
+              <CardContent className="p-8">
+                {!room?.config?.columns ? (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <p>Configuration de la salle non disponible</p>
+                  </div>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <div className={`flex ${getResponsiveGap()} justify-center items-start min-w-min p-4`}>
+                      {room.config.columns.map((column, colIndex) => (
+                        <div key={column.id} className={`flex flex-col ${getResponsiveGap()}`}>
+                          {Array.from({ length: column.tables }).map((_, tableIndex) => (
                             <div
-                              key={seatIndex}
-                              data-seat-number={seatNumber}
-                              draggable={!!student}
-                              onDragStart={(e) => student && handleDragStart(e as any, student.id)}
+                              key={tableIndex}
+                              className={`relative ${getResponsiveTableSize()} rounded-lg border-2 flex items-center justify-center`}
+                              style={getTableStyle()}
                               onDragOver={handleDragOver}
-                              onDrop={(e) => handleDrop(e, seatNumber)}
-                              onClick={() => handleSeatClick(seatNumber)}
-                              className={cn(
-                                "relative flex h-10 w-10 cursor-pointer items-center justify-center rounded text-xs font-medium transition-all",
-                                student
-                                  ? "bg-black text-white hover:bg-gray-800"
-                                  : "border-2 border-gray-300 bg-gray-100 hover:border-blue-400 hover:bg-blue-50",
-                              )}
+                              onDrop={(e) => {
+                                // Determine the first seat number in this table for the drop target
+                                const firstSeatInTable = getSeatNumber(colIndex, tableIndex, 0)
+                                handleDrop(e, firstSeatInTable)
+                              }}
                             >
-                              {student && (
-                                <>
-                                  <div
-                                    className="relative flex h-10 w-10 cursor-move items-center justify-center rounded-full bg-black text-xs font-bold text-white shadow-md"
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, student.id)}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleSeatClick(seatNumber, student.id)
-                                    }}
-                                  >
-                                    {getInitials(student)}
-                                  </div>
-                                  <span className="mt-1 text-center text-[10px] leading-tight text-black">
-                                    {student.last_name}
-                                    <br />
-                                    {student.first_name}
-                                  </span>
-                                </>
-                              )}
-                              {!student && <span className="text-gray-400">{seatNumber}</span>}
+                              <div
+                                className={`grid ${
+                                  column.seatsPerTable === 1
+                                    ? "grid-cols-1"
+                                    : column.seatsPerTable === 2
+                                      ? "grid-cols-2"
+                                      : column.seatsPerTable === 3
+                                        ? "grid-cols-3"
+                                        : column.seatsPerTable === 4
+                                          ? "grid-cols-2"
+                                          : column.seatsPerTable === 6
+                                            ? "grid-cols-3"
+                                            : "grid-cols-2"
+                                } gap-3 p-4 place-items-center w-full h-full`}
+                              >
+                                {Array.from({ length: column.seatsPerTable }).map((_, seatIndex) => {
+                                  const seatNumber = getSeatNumber(colIndex, tableIndex, seatIndex)
+                                  const assignment = assignments.get(seatNumber)
+                                  const student = assignment ? students.find((s) => s.id === assignment) : null
+                                  const isOccupied = !!student
+
+                                  return (
+                                    <div
+                                      key={`seat-${tableIndex}-${seatIndex}`}
+                                      data-seat-number={seatNumber}
+                                      draggable={!!student}
+                                      // Pass student.id to handleDragStart
+                                      onDragStart={(e) => student && handleDragStart(e as any, student.id)}
+                                      onDragOver={handleDragOver}
+                                      onDrop={(e) => handleDrop(e, seatNumber)}
+                                      onTouchStart={(e) => student && handleTouchStart(e as any, student.id)}
+                                      onTouchMove={handleTouchMove}
+                                      onTouchEnd={(e) => handleTouchEnd(e, seatNumber)}
+                                      // Use the new handleSeatClick
+                                      onClick={() => handleSeatClick(seatNumber)}
+                                      className={cn(
+                                        "w-10 h-10 border-2 rounded flex items-center justify-center text-xs font-medium transition-all cursor-pointer",
+                                        student
+                                          ? "bg-black text-white border-black hover:scale-105"
+                                          : "bg-gray-100 text-gray-400 border-gray-300 hover:border-gray-400 hover:bg-gray-200",
+                                      )}
+                                      style={getSeatStyle(isOccupied)}
+                                    >
+                                      {student ? (
+                                        <>
+                                          <span className="text-white text-xs font-semibold">
+                                            {getInitials(student)}
+                                          </span>
+                                          {/* Removed direct remove button from seat for consistency with dialog */}
+                                        </>
+                                      ) : (
+                                        <span className="text-xs">{seatNumber}</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
-                          )
-                        })}
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Panel - Students List */}
+          <div className="col-span-2">
+            <Card className="sticky top-6 border-gray-200 dark:border-gray-800">
+              <CardContent
+                className="p-4"
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setIsDragOverUnplaced(true) // Set flag when dragging over
+                }}
+                onDragLeave={() => setIsDragOverUnplaced(false)} // Reset flag when leaving
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragOverUnplaced(false) // Reset flag on drop
+                  handleDropToUnplacedArea()
+                }}
+              >
+                <h3 className="font-semibold mb-4 text-black dark:text-white">
+                  Élèves non placés ({getUnassignedStudents().length}/{students.length})
+                </h3>
+                <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+                  {getUnassignedStudents().map((student) => (
+                    <div
+                      key={student.id}
+                      draggable
+                      // Pass student.id to handleDragStart
+                      onDragStart={(e) => handleDragStart(e as any, student.id)}
+                      onTouchStart={(e) => handleTouchStart(e as any, student.id)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 cursor-move hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                    >
+                      <div className="font-medium text-sm text-black dark:text-white">
+                        {student.last_name} {student.first_name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs bg-gray-200 dark:bg-gray-800 text-black dark:text-white"
+                        >
+                          {student.class_name}
+                        </Badge>
+                        {student.role === "delegue" && (
+                          <Badge className="text-xs bg-blue-500 hover:bg-blue-600 text-white border-0">Délégué</Badge>
+                        )}
+                        {student.role === "eco-delegue" && (
+                          <Badge className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white border-0">
+                            Éco-délégué
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
+                  {getUnassignedStudents().length === 0 && (
+                    <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+                      <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-black dark:text-white" />
+                      <p className="text-sm">Tous les élèves sont placés</p>
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Share Dialog */}
+        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+          <DialogContent className="border-gray-200 dark:border-gray-800">
+            <DialogHeader>
+              <DialogTitle className="text-black dark:text-white">Partager le plan de classe</DialogTitle>
+              <DialogDescription className="text-gray-600 dark:text-gray-400">
+                Choisissez comment partager ce plan de classe
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="share-email" className="text-black dark:text-white">
+                  Envoyer par email
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="share-email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={shareEmail}
+                    onChange={(e) => setShareEmail(e.target.value)}
+                    className="border-gray-300 dark:border-gray-700"
+                  />
+                  <Button
+                    onClick={handleShareByEmail}
+                    className="bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black"
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Envoyer
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-black dark:text-white">Télécharger</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadImage}
+                    className="flex-1 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Image
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadPDF}
+                    className="flex-1 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    PDF
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-black dark:text-white">Créer un lien de visualisation</Label>
+                <Button
+                  variant="outline"
+                  onClick={handleCreateLink}
+                  className="w-full border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Générer un lien
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog for student selection */}
+        <Dialog open={selectedSeatForDialog !== null} onOpenChange={(open) => !open && setSelectedSeatForDialog(null)}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Sélectionner un élève</DialogTitle>
+              <DialogDescription>Choisissez un élève à placer sur la place {selectedSeatForDialog}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 mt-4">
+              {getUnassignedStudents().map((student) => (
+                <Button
+                  key={student.id}
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3 bg-transparent"
+                  onClick={() => {
+                    const newAssignments = new Map(assignments)
+                    newAssignments.set(selectedSeatForDialog!, student.id)
+                    setAssignments(newAssignments)
+                    setSelectedSeatForDialog(null)
+                  }}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <div className="font-medium">
+                      {student.last_name} {student.first_name}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {student.class_name}
+                      </Badge>
+                      {student.role === "delegue" && <Badge className="text-xs bg-blue-500 text-white">Délégué</Badge>}
+                      {student.role === "eco-delegue" && (
+                        <Badge className="text-xs bg-emerald-500 text-white">Éco-délégué</Badge>
+                      )}
+                    </div>
+                  </div>
+                </Button>
               ))}
+              {getUnassignedStudents().length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Tous les élèves sont déjà placés</p>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
 
-        {/* Right column - Action buttons */}
-        <div className="w-64 border-l bg-white p-6 overflow-y-auto">
-          <h2 className="mb-4 text-lg font-semibold">Actions</h2>
-
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Compléter (élèves restants)</h3>
-              <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleCompletePlan}>
-                <Shuffle className="mr-2 h-4 w-4" />
-                Compléter aléatoire
-              </Button>
+        {/* Unplaced students list */}
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle className="text-sm">
+              Élèves non placés ({getUnassignedStudents().length}/{students.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="space-y-2 max-h-[400px] overflow-y-auto p-2 rounded-md border-2 border-dashed border-transparent transition-all"
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove("bg-blue-50", "border-blue-400")
+                handleDropToUnplacedArea()
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.add("bg-blue-50", "border-blue-400")
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.classList.remove("bg-blue-50", "border-blue-400")
+              }}
+            >
+              {getUnassignedStudents().length === 0 ? (
+                <div className="flex items-center justify-center gap-2 p-4 text-green-600 bg-green-50 rounded-md border border-green-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="text-sm font-medium">Tous les élèves sont placés</span>
+                </div>
+              ) : (
+                getUnassignedStudents().map((student) => (
+                  <div
+                    key={student.id}
+                    draggable
+                    onDragStart={() => handleDragStart(null as any, student.id)} // Pass student ID
+                    className="flex items-center gap-2 p-2 bg-white border rounded-md cursor-move hover:bg-gray-50 transition-colors"
+                  >
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm">
+                      {student.first_name} {student.last_name}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
-
-            <div className="border-t pt-4" />
-
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Placer tous les élèves</h3>
-              <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleRandomPlacementAll}>
-                <Shuffle className="mr-2 h-4 w-4" />
-                Placement aléatoire
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-transparent"
-                onClick={() => handleAlphabeticalPlacement("asc")}
-              >
-                <ArrowDownAZ className="mr-2 h-4 w-4" />
-                A-Z
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-transparent"
-                onClick={() => handleAlphabeticalPlacement("desc")}
-              >
-                <ArrowUpAZ className="mr-2 h-4 w-4" />
-                Z-A
-              </Button>
-              <Button variant="destructive" size="sm" className="w-full" onClick={handleRemoveAll}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Tout retirer
-              </Button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       <AlertDialog open={showRemoveConfirmation} onOpenChange={setShowRemoveConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Retirer l'élève du plan ?</AlertDialogTitle>
-            <AlertDialogDescription>Voulez-vous vraiment retirer cet élève du plan de classe ?</AlertDialogDescription>
+            <AlertDialogDescription>
+              Voulez-vous retirer cet élève du plan de classe ? Il sera replacé dans la liste des élèves non placés.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-center space-x-2 py-2">
+          <div className="flex items-center space-x-2 my-4">
             <Checkbox
-              id="dont-show-again"
+              id="dontShowAgain"
               checked={dontShowAgain}
               onCheckedChange={(checked) => setDontShowAgain(checked === true)}
             />
             <label
-              htmlFor="dont-show-again"
+              htmlFor="dontShowAgain"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
-              Ne plus afficher ce message
+              Ne plus afficher cette confirmation
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelRemove}>Non</AlertDialogCancel>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowRemoveConfirmation(false)
+                setStudentToRemove(null)
+                setDontShowAgain(false)
+              }}
+            >
+              Non
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmRemove}>Oui</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={selectedSeatForDialog !== null} onOpenChange={() => setSelectedSeatForDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sélectionner un élève pour la place {selectedSeatForDialog}</DialogTitle>
-            <DialogDescription>Choisissez un élève à placer sur cette place</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 space-y-2 overflow-y-auto">
-            {getFilteredUnassignedStudents().map((student) => (
-              <Button
-                key={student.id}
-                variant="outline"
-                className="w-full justify-start bg-transparent"
-                onClick={() => {
-                  if (selectedSeatForDialog) {
-                    const newAssignments = new Map(assignments)
-                    newAssignments.set(selectedSeatForDialog, student.id)
-                    setAssignments(newAssignments)
-                    setSelectedSeatForDialog(null)
-                  }
-                }}
-              >
-                <User className="mr-2 h-4 w-4" />
-                {student.last_name} {student.first_name}
-                <Badge variant="outline" className="ml-auto">
-                  {student.class_name}
-                </Badge>
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Partager le plan de classe</DialogTitle>
-            <DialogDescription>Choisissez comment partager le plan de classe</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="share-email">Email</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="share-email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={shareEmail}
-                  onChange={(e) => setShareEmail(e.target.value)}
-                />
-                <Button onClick={handleShareByEmail}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Envoyer
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={handleDownloadImage}>
-                <Download className="mr-2 h-4 w-4" />
-                Image
-              </Button>
-              <Button variant="outline" onClick={handleDownloadPDF}>
-                <Download className="mr-2 h-4 w-4" />
-                PDF
-              </Button>
-              <Button variant="outline" onClick={handleCreateLink} className="col-span-2 bg-transparent">
-                <Link2 className="mr-2 h-4 w-4" />
-                Créer un lien de partage
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
