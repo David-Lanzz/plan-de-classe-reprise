@@ -101,9 +101,24 @@ export function SafeSeatingPlanEditorWrapper({ subRoom, onBack }: SafeSeatingPla
 
       if (classLinksError) {
         console.error("[v0] SafeWrapper: Error loading class links:", classLinksError)
-        console.warn("[v0] SafeWrapper: Falling back to class_ids array from sub_rooms table")
-        const classIds = subRoom.class_ids || []
-        console.log("[v0] SafeWrapper: Using fallback class_ids:", classIds)
+        console.warn("[v0] SafeWrapper: Falling back to class_ids from sub_rooms table")
+
+        // Query sub_rooms table directly to get class_ids
+        const { data: subRoomData, error: subRoomError } = await supabase
+          .from("sub_rooms")
+          .select("class_ids")
+          .eq("id", subRoom.id)
+          .single()
+
+        if (subRoomError || !subRoomData) {
+          console.error("[v0] SafeWrapper: Error loading sub_room class_ids:", subRoomError)
+          setError("Impossible de charger les classes associées à cette sous-salle")
+          setIsLoading(false)
+          return
+        }
+
+        const classIds = subRoomData.class_ids || []
+        console.log("[v0] SafeWrapper: Using class_ids from sub_rooms table:", classIds)
 
         const enriched: SubRoomProps = {
           ...subRoom,
@@ -120,7 +135,22 @@ export function SafeSeatingPlanEditorWrapper({ subRoom, onBack }: SafeSeatingPla
       console.log("[v0] SafeWrapper: Class IDs loaded from junction table:", classIds)
 
       if (classIds.length === 0) {
-        console.warn("[v0] SafeWrapper: No classes associated with this sub-room")
+        console.warn("[v0] SafeWrapper: No classes in junction table, trying sub_rooms.class_ids")
+
+        const { data: subRoomData } = await supabase.from("sub_rooms").select("class_ids").eq("id", subRoom.id).single()
+
+        const fallbackClassIds = subRoomData?.class_ids || []
+        console.log("[v0] SafeWrapper: Using fallback class_ids:", fallbackClassIds)
+
+        const enriched: SubRoomProps = {
+          ...subRoom,
+          class_ids: fallbackClassIds,
+        }
+
+        setRoom(roomData)
+        setEnrichedSubRoom(enriched)
+        setIsLoading(false)
+        return
       }
 
       const enriched: SubRoomProps = {

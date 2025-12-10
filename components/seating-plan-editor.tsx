@@ -44,8 +44,6 @@ interface Student {
   last_name: string
   class_name: string
   role: string
-  is_delegate?: boolean
-  is_eco_delegate?: boolean
   gender?: string
 }
 
@@ -98,7 +96,6 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
   const [dontShowAgain, setDontShowAgain] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all")
-  const [delegateFilter, setDelegateFilter] = useState<"all" | "delegate" | "eco">("all")
 
   useEffect(() => {
     fetchData()
@@ -114,7 +111,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
 
     const { data: studentsData, error: studentsError } = await supabase
       .from("students")
-      .select("id, first_name, last_name, class_name, role, is_delegate, is_eco_delegate, gender")
+      .select("id, first_name, last_name, class_name, role, gender")
       .in("class_id", subRoom.class_ids)
       .order("last_name")
 
@@ -571,29 +568,6 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
     return `${student.last_name.charAt(0)}.${student.first_name.charAt(0)}`.toUpperCase()
   }
 
-  const renderDelegateBadges = (student: Student) => {
-    return (
-      <div className="absolute -top-1 -right-1 flex gap-0.5">
-        {student.is_delegate && (
-          <div
-            className="h-4 w-4 rounded-full bg-blue-500 flex items-center justify-center text-[8px] font-bold text-white shadow-sm border border-white"
-            title="Délégué"
-          >
-            D
-          </div>
-        )}
-        {student.is_eco_delegate && (
-          <div
-            className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center text-[8px] font-bold text-white shadow-sm border border-white"
-            title="Éco-délégué"
-          >
-            E
-          </div>
-        )}
-      </div>
-    )
-  }
-
   const calculateSeatNumber = (colIndex: number, tableIndex: number, seatIndex: number) => {
     if (!room) return 0
     let seatNumber = 0
@@ -623,93 +597,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
       filtered = filtered.filter((s) => s.gender === genderFilter)
     }
 
-    // Delegate filter
-    if (delegateFilter === "delegate") {
-      filtered = filtered.filter((s) => s.is_delegate)
-    } else if (delegateFilter === "eco") {
-      filtered = filtered.filter((s) => s.is_eco_delegate)
-    }
-
     return filtered
-  }
-
-  const handleCompleteRandom = () => {
-    const unassigned = getUnassignedStudents()
-    const availableSeats: number[] = []
-    const totalSeats = getTotalSeats()
-
-    for (let i = 1; i <= totalSeats; i++) {
-      if (!assignments.has(i)) {
-        availableSeats.push(i)
-      }
-    }
-
-    if (availableSeats.length === 0) {
-      toast({
-        title: "Aucune place disponible",
-        description: "Toutes les places sont déjà occupées",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const shuffledSeats = availableSeats.sort(() => Math.random() - 0.5)
-    const shuffledStudents = [...unassigned].sort(() => Math.random() - 0.5)
-
-    const newAssignments = new Map(assignments)
-
-    shuffledStudents.forEach((student, index) => {
-      if (index < shuffledSeats.length) {
-        newAssignments.set(shuffledSeats[index], student.id)
-      }
-    })
-
-    setAssignments(newAssignments)
-    toast({
-      title: "Complément aléatoire",
-      description: `${Math.min(shuffledStudents.length, shuffledSeats.length)} élève(s) placé(s) aléatoirement`,
-    })
-  }
-
-  const handleCompleteAlphabetical = (order: "asc" | "desc") => {
-    const unassigned = getUnassignedStudents()
-    const availableSeats: number[] = []
-    const totalSeats = getTotalSeats()
-
-    for (let i = 1; i <= totalSeats; i++) {
-      if (!assignments.has(i)) {
-        availableSeats.push(i)
-      }
-    }
-
-    if (availableSeats.length === 0) {
-      toast({
-        title: "Aucune place disponible",
-        description: "Toutes les places sont déjà occupées",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const sorted = [...unassigned].sort((a, b) => {
-      const nameA = `${a.last_name} ${a.first_name}`.toLowerCase()
-      const nameB = `${b.last_name} ${b.first_name}`.toLowerCase()
-      return order === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA)
-    })
-
-    const newAssignments = new Map(assignments)
-
-    sorted.forEach((student, index) => {
-      if (index < availableSeats.length) {
-        newAssignments.set(availableSeats[index], student.id)
-      }
-    })
-
-    setAssignments(newAssignments)
-    toast({
-      title: `Complément alphabétique ${order === "asc" ? "A-Z" : "Z-A"}`,
-      description: `${Math.min(sorted.length, availableSeats.length)} élève(s) placé(s)`,
-    })
   }
 
   return (
@@ -799,33 +687,6 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
                 Filles
               </Button>
             </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant={delegateFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDelegateFilter("all")}
-                className="flex-1"
-              >
-                Tous
-              </Button>
-              <Button
-                variant={delegateFilter === "delegate" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDelegateFilter("delegate")}
-                className="flex-1"
-              >
-                Délégués
-              </Button>
-              <Button
-                variant={delegateFilter === "eco" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDelegateFilter("eco")}
-                className="flex-1"
-              >
-                Éco-dél.
-              </Button>
-            </div>
           </div>
 
           <div
@@ -866,7 +727,7 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
           <div className="space-y-2">
             {getFilteredUnassignedStudents().length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
-                {searchTerm || genderFilter !== "all" || delegateFilter !== "all"
+                {searchTerm || genderFilter !== "all"
                   ? "Aucun élève ne correspond aux filtres"
                   : "Tous les élèves sont placés"}
               </div>
@@ -885,22 +746,6 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {student.is_delegate && (
-                      <div
-                        className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white"
-                        title="Délégué"
-                      >
-                        D
-                      </div>
-                    )}
-                    {student.is_eco_delegate && (
-                      <div
-                        className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center text-[10px] font-bold text-white"
-                        title="Éco-délégué"
-                      >
-                        E
-                      </div>
-                    )}
                     <Badge variant="outline" className="text-xs">
                       {student.class_name}
                     </Badge>
@@ -963,7 +808,6 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
                                     }}
                                   >
                                     {getInitials(student)}
-                                    {renderDelegateBadges(student)}
                                   </div>
                                   <span className="mt-1 text-center text-[10px] leading-tight text-black">
                                     {student.last_name}
@@ -992,27 +836,9 @@ export function SeatingPlanEditor({ subRoom, room, onBack }: SeatingPlanEditorPr
           <div className="space-y-6">
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Compléter (élèves restants)</h3>
-              <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleCompleteRandom}>
+              <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleCompletePlan}>
                 <Shuffle className="mr-2 h-4 w-4" />
                 Compléter aléatoire
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-transparent"
-                onClick={() => handleCompleteAlphabetical("asc")}
-              >
-                <ArrowDownAZ className="mr-2 h-4 w-4" />
-                Compléter A-Z
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-transparent"
-                onClick={() => handleCompleteAlphabetical("desc")}
-              >
-                <ArrowUpAZ className="mr-2 h-4 w-4" />
-                Compléter Z-A
               </Button>
             </div>
 
