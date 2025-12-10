@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { createBrowserClient } from "@supabase/ssr"
 import { toast } from "@/components/ui/use-toast"
 
@@ -23,6 +24,12 @@ interface Room {
   id: string
   name: string
   code: string
+}
+
+interface SubRoom {
+  id: string
+  name: string
+  seat_assignments: any
 }
 
 interface Teacher {
@@ -41,8 +48,11 @@ export function CreateProposalDialog({
 }: CreateProposalDialogProps) {
   const [name, setName] = useState("")
   const [selectedRoomId, setSelectedRoomId] = useState("")
+  const [selectedSubRoomId, setSelectedSubRoomId] = useState("")
   const [selectedTeacherId, setSelectedTeacherId] = useState("")
+  const [useExistingSubRoom, setUseExistingSubRoom] = useState(false)
   const [rooms, setRooms] = useState<Room[]>([])
+  const [subRooms, setSubRooms] = useState<SubRoom[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [classId, setClassId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
@@ -57,6 +67,15 @@ export function CreateProposalDialog({
       fetchData()
     }
   }, [open, establishmentId, userId])
+
+  useEffect(() => {
+    if (useExistingSubRoom && selectedTeacherId && classId) {
+      fetchSubRooms()
+    } else {
+      setSubRooms([])
+      setSelectedSubRoomId("")
+    }
+  }, [useExistingSubRoom, selectedTeacherId, classId])
 
   async function fetchData() {
     try {
@@ -76,6 +95,9 @@ export function CreateProposalDialog({
             .filter(
               (teacher: any, index: number, self: any[]) =>
                 teacher && self.findIndex((t) => t?.id === teacher?.id) === index,
+            )
+            .sort((a: Teacher, b: Teacher) =>
+              `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`),
             )
           setTeachers(uniqueTeachers)
         }
@@ -101,13 +123,56 @@ export function CreateProposalDialog({
     }
   }
 
+  async function fetchSubRooms() {
+    try {
+      const { data: teacherData } = await supabase
+        .from("teachers")
+        .select("profile_id")
+        .eq("id", selectedTeacherId)
+        .single()
+
+      if (!teacherData) return
+
+      const { data: subRoomsData } = await supabase
+        .from("sub_rooms")
+        .select("id, name, seat_assignments")
+        .contains("class_ids", [classId])
+        .eq("created_by", teacherData.profile_id)
+        .order("name")
+
+      if (subRoomsData) {
+        setSubRooms(subRoomsData)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching sub-rooms:", error)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!name || !selectedRoomId || !selectedTeacherId || !classId) {
+    if (!name || !selectedTeacherId || !classId) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (useExistingSubRoom && !selectedSubRoomId) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner une sous-salle",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!useExistingSubRoom && !selectedRoomId) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner une salle",
         variant: "destructive",
       })
       return
@@ -116,15 +181,37 @@ export function CreateProposalDialog({
     setIsLoading(true)
 
     try {
+      let seatAssignments = {}
+      let roomId = selectedRoomId
+
+      if (useExistingSubRoom && selectedSubRoomId) {
+        const subRoom = subRooms.find((sr) => sr.id === selectedSubRoomId)
+        if (subRoom) {
+          seatAssignments = subRoom.seat_assignments || {}
+
+          // Get room_id from the sub_room
+          const { data: subRoomData } = await supabase
+            .from("sub_rooms")
+            .select("room_id")
+            .eq("id", selectedSubRoomId)
+            .single()
+
+          if (subRoomData) {
+            roomId = subRoomData.room_id
+          }
+        }
+      }
+
       const { error } = await supabase.from("sub_room_proposals").insert({
         name,
-        room_id: selectedRoomId,
+        room_id: roomId,
         class_id: classId,
         teacher_id: selectedTeacherId,
         proposed_by: userId,
         establishment_id: establishmentId,
         status: "pending",
-        seat_assignments: {},
+        seat_assignments: seatAssignments,
+        sub_room_id: useExistingSubRoom ? selectedSubRoomId : null,
       })
 
       if (error) throw error
@@ -134,9 +221,12 @@ export function CreateProposalDialog({
         description: "Proposition créée avec succès",
       })
 
+      // Reset form
       setName("")
       setSelectedRoomId("")
+      setSelectedSubRoomId("")
       setSelectedTeacherId("")
+      setUseExistingSubRoom(false)
       onSuccess()
     } catch (error: any) {
       console.error("[v0] Error creating proposal:", error)
@@ -171,22 +261,6 @@ export function CreateProposalDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="room">Salle</Label>
-            <Select value={selectedRoomId} onValueChange={setSelectedRoomId} required>
-              <SelectTrigger id="room">
-                <SelectValue placeholder="Sélectionner une salle" />
-              </SelectTrigger>
-              <SelectContent>
-                {rooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id}>
-                    {room.name} ({room.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="teacher">Professeur destinataire</Label>
             <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId} required>
               <SelectTrigger id="teacher">
@@ -205,6 +279,69 @@ export function CreateProposalDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="useExisting"
+              checked={useExistingSubRoom}
+              onCheckedChange={(checked) => setUseExistingSubRoom(checked === true)}
+            />
+            <Label htmlFor="useExisting" className="text-sm font-normal cursor-pointer">
+              Créer à partir d'une sous-salle existante
+            </Label>
+          </div>
+
+          {useExistingSubRoom ? (
+            <div className="space-y-2">
+              <Label htmlFor="subroom">Sous-salle de référence</Label>
+              <Select
+                value={selectedSubRoomId}
+                onValueChange={setSelectedSubRoomId}
+                required
+                disabled={!selectedTeacherId}
+              >
+                <SelectTrigger id="subroom">
+                  <SelectValue
+                    placeholder={
+                      selectedTeacherId ? "Sélectionner une sous-salle" : "Sélectionnez d'abord un professeur"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {subRooms.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      {selectedTeacherId ? "Aucune sous-salle disponible" : "Sélectionnez un professeur"}
+                    </div>
+                  ) : (
+                    subRooms.map((subRoom) => (
+                      <SelectItem key={subRoom.id} value={subRoom.id}>
+                        {subRoom.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Le plan actuel de cette sous-salle sera repris. Une fois validé, il remplacera la sous-salle d'origine.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="room">Salle physique</Label>
+              <Select value={selectedRoomId} onValueChange={setSelectedRoomId} required>
+                <SelectTrigger id="room">
+                  <SelectValue placeholder="Sélectionner une salle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id}>
+                      {room.name} ({room.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="flex gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
