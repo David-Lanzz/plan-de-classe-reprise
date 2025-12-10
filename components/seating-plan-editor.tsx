@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -22,7 +22,8 @@ import {
   Mail,
   Download,
   Link2,
-  CheckCircle,
+  CheckCircle2,
+  User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
@@ -297,21 +298,48 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
         throw deleteError
       }
 
-      const assignmentsToInsert = Array.from(assignments.entries()).map(([seatNumber, studentId]) => ({
-        sub_room_id: subRoom.id,
-        student_id: studentId,
-        seat_position: seatNumber,
-      }))
+      const assignmentsToInsert = Array.from(assignments.entries()).map(([seatNumber, studentId]) => {
+        // Calculate position from seat number based on room layout
+        const tableIndex = Math.floor(
+          (seatNumber - 1) / room.config.columns.reduce((total, col) => total + col.tables * col.seatsPerTable, 0),
+        )
+        const seatInTable =
+          (seatNumber - 1) % room.config.columns.reduce((total, col) => total + col.tables * col.seatsPerTable, 0)
+        const column = Math.floor(tableIndex / room.config.columns.length)
+        const row = tableIndex % room.config.columns.length
+
+        return {
+          sub_room_id: subRoom.id,
+          student_id: studentId,
+          seat_position: {
+            column,
+            table: tableIndex,
+            seat: seatInTable,
+            seatNumber,
+          },
+        }
+      })
 
       console.log("[v0] Assignments to insert:", assignmentsToInsert)
 
       if (assignmentsToInsert.length > 0) {
-        const { error: insertError } = await supabase.from("seating_assignments").insert(assignmentsToInsert)
+        const { data, error: insertError } = await supabase
+          .from("seating_assignments")
+          .insert(assignmentsToInsert)
+          .select()
 
         if (insertError) {
           console.error("[v0] Error inserting assignments:", insertError)
+          console.error("[v0] Error details:", {
+            code: insertError.code,
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint,
+          })
           throw insertError
         }
+
+        console.log("[v0] Inserted assignments:", data)
       }
 
       setSavedAssignments(new Map(assignments))
@@ -320,11 +348,12 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
         title: "Plan sauvegardé",
         description: "Le plan de classe a été enregistré avec succès",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error saving seating plan:", error)
       toast({
-        title: "Erreur",
-        description: "Impossible de sauvegarder le plan de classe",
+        title: "Erreur de sauvegarde",
+        description:
+          error?.message || "Impossible de sauvegarder le plan de classe. Vérifiez la console pour plus de détails.",
         variant: "destructive",
       })
     } finally {
@@ -427,16 +456,6 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
         description: `Lien: ${window.location.origin}/share/seating-plan/${subRoom.id}`,
       })
     }
-  }
-
-  const handleDropOnList = (e: React.DragEvent) => {
-    e.preventDefault()
-    if (!draggedStudent) return
-
-    const newAssignments = new Map(assignments)
-    newAssignments.delete(Array.from(newAssignments.entries()).find(([seat]) => seat === draggedStudent.id)?.[0] || -1)
-    setAssignments(newAssignments)
-    setDraggedStudent(null)
   }
 
   const handleTouchStart = (e: React.TouchEvent, student: Student) => {
@@ -598,6 +617,30 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
     return seatNumber
   }
 
+  const handleDropToUnplacedArea = () => {
+    if (draggedStudent) {
+      console.log("[v0] Removing student from seat:", draggedStudent)
+
+      // Find and remove the student from their current seat
+      const entries = Array.from(assignments.entries())
+      const entry = entries.find(([_, studentId]) => studentId === draggedStudent.id)
+
+      if (entry) {
+        const [seatNumber] = entry
+        const newAssignments = new Map(assignments)
+        newAssignments.delete(seatNumber)
+        setAssignments(newAssignments)
+
+        toast({
+          title: "Élève retiré",
+          description: `${draggedStudent.first_name} ${draggedStudent.last_name} a été retiré de la place ${seatNumber}`,
+        })
+      }
+
+      setDraggedStudent(null)
+    }
+  }
+
   if (!room) {
     return <div className="flex items-center justify-center h-screen">Chargement...</div>
   }
@@ -681,7 +724,7 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                     className="w-full mt-2 justify-start border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 bg-transparent"
                     onClick={handleCompletePlan}
                   >
-                    <CheckCircle className="mr-2 h-4 w-4" />
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
                     Compléter
                   </Button>
                 </div>
@@ -735,7 +778,7 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                     size="sm"
                     className="w-full justify-start bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black"
                   >
-                    <CheckCircle className="mr-2 h-4 w-4" />
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
                     Valider
                   </Button>
                 </div>
@@ -841,7 +884,6 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                 onDragOver={(e) => {
                   e.preventDefault()
                 }}
-                onDrop={handleDropOnList}
               >
                 <h3 className="font-semibold mb-4 text-black dark:text-white">
                   Élèves non placés ({getUnassignedStudents().length}/{students.length})
@@ -880,7 +922,7 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
                   ))}
                   {getUnassignedStudents().length === 0 && (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">
-                      <CheckCircle className="h-12 w-12 mx-auto mb-2 text-black dark:text-white" />
+                      <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-black dark:text-white" />
                       <p className="text-sm">Tous les élèves sont placés</p>
                     </div>
                   )}
@@ -999,6 +1041,53 @@ export function SeatingPlanEditor({ subRoom, onBack }: SeatingPlanEditorProps) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Unplaced students list */}
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle className="text-sm">
+              Élèves non placés ({getUnassignedStudents().length}/{students.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="space-y-2 max-h-[400px] overflow-y-auto p-2 rounded-md border-2 border-dashed border-transparent transition-all"
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove("bg-blue-50", "border-blue-400")
+                handleDropToUnplacedArea()
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.add("bg-blue-50", "border-blue-400")
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.classList.remove("bg-blue-50", "border-blue-400")
+              }}
+            >
+              {getUnassignedStudents().length === 0 ? (
+                <div className="flex items-center justify-center gap-2 p-4 text-green-600 bg-green-50 rounded-md border border-green-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="text-sm font-medium">Tous les élèves sont placés</span>
+                </div>
+              ) : (
+                getUnassignedStudents().map((student) => (
+                  <div
+                    key={student.id}
+                    draggable
+                    onDragStart={() => handleDragStart(student)}
+                    className="flex items-center gap-2 p-2 bg-white border rounded-md cursor-move hover:bg-gray-50 transition-colors"
+                  >
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm">
+                      {student.first_name} {student.last_name}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
