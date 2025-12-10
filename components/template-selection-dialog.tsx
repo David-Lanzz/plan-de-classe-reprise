@@ -103,7 +103,7 @@ export function TemplateSelectionDialog({
       onMouseLeave={() => setHoveredTemplate(null)}
     >
       <CardContent className="p-4">
-        <div className="absolute top-2 right-2 flex gap-1">
+        <div className="absolute top-2 right-2 flex gap-1 z-10">
           {template.isPinned && (
             <div className="bg-amber-500 p-1 rounded-full">
               <Star className="h-3 w-3 text-white fill-white" />
@@ -153,36 +153,40 @@ export function TemplateSelectionDialog({
         </div>
 
         {template.isCustom && (
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-2 relative z-20">
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 bg-transparent"
+              className="flex-1 bg-white dark:bg-slate-800"
               onClick={(e) => handleTogglePin(template.id, e)}
             >
               <Star className={`h-4 w-4 mr-1 ${template.isPinned ? "fill-amber-500 text-amber-500" : ""}`} />
               {template.isPinned ? "Désépingler" : "Épingler"}
             </Button>
-            <Button size="sm" variant="outline" onClick={(e) => handleDeleteTemplate(template.id, e)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white dark:bg-slate-800"
+              onClick={(e) => handleDeleteTemplate(template.id, e)}
+            >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         )}
 
-        {/* Hover overlay with CTA */}
         <div
-          className={`absolute inset-0 bg-gradient-to-t from-emerald-600/95 to-emerald-500/95 flex items-center justify-center transition-opacity duration-300 ${
+          className={`absolute inset-0 bg-gradient-to-t from-emerald-600/95 to-emerald-500/95 flex items-center justify-center transition-opacity duration-300 z-10 ${
             hoveredTemplate === template.id ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
+          onClick={() => {
+            onSelectTemplate(template)
+            onOpenChange(false)
+          }}
         >
           <Button
             size="lg"
             variant="secondary"
             className="bg-white text-emerald-700 hover:bg-white/90 font-semibold shadow-lg"
-            onClick={() => {
-              onSelectTemplate(template)
-              onOpenChange(false)
-            }}
           >
             <LayoutGrid className="mr-2 h-5 w-5" />
             Utiliser ce template

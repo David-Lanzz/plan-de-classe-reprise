@@ -859,6 +859,32 @@ export function StudentsManagement({ establishmentId, userRole, userId, onBack }
 
     const supabase = createClient()
 
+    const { data: existingProfile, error: checkError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", accessData.username)
+      .neq("id", selectedStudent.profile_id)
+      .maybeSingle()
+
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("[v0] Error checking username:", checkError)
+      toast({
+        title: "Erreur",
+        description: "Impossible de vérifier l'identifiant",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (existingProfile) {
+      toast({
+        title: "Erreur",
+        description: `L'identifiant "${accessData.username}" est déjà utilisé par un autre utilisateur`,
+        variant: "destructive",
+      })
+      return
+    }
+
     if (accessData.password && accessData.password !== "••••••••" && accessData.password.trim() !== "") {
       console.log("[v0] Updating profile with new password")
       const { data: hashedPassword, error: hashError } = await supabase.rpc("hash_password", {
