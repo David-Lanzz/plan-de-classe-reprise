@@ -663,7 +663,8 @@ export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack 
   }
 
   const getResponsiveTableSize = () => {
-    const cols = room?.config.columns.length || 0
+    if (!room?.config?.columns) return "w-36 h-26"
+    const cols = room.config.columns.length
 
     if (cols <= 2) return "w-36 h-26"
     if (cols <= 4) return "w-32 h-24"
@@ -671,7 +672,8 @@ export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack 
   }
 
   const getResponsiveSeatSize = () => {
-    const cols = room?.config.columns.length || 0
+    if (!room?.config?.columns) return "w-10 h-10"
+    const cols = room.config.columns.length
 
     // Places plus petites et carrées
     if (cols <= 2) return "w-10 h-10"
@@ -680,7 +682,8 @@ export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack 
   }
 
   const getResponsiveGap = () => {
-    const columnCount = room?.config.columns.length || 0
+    if (!room?.config?.columns) return "gap-6 md:gap-8"
+    const columnCount = room.config.columns.length
 
     if (columnCount <= 2) return "gap-6 md:gap-8"
     if (columnCount <= 4) return "gap-4 md:gap-6"
@@ -718,6 +721,8 @@ export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack 
   }
 
   const getSeatNumber = (colIndex: number, tableIndex: number, seatIndex: number) => {
+    if (!room?.config?.columns) return 0
+
     let seatNumber = 0
     // Count all seats in previous columns
     for (let i = 0; i < colIndex; i++) {
@@ -920,83 +925,91 @@ export function SeatingPlanEditor({ subRoom, room: initialRoom, onClose, onBack 
           <div className="col-span-8">
             <Card className="border-gray-200 dark:border-gray-800">
               <CardContent className="p-8">
-                <div className="w-full overflow-x-auto">
-                  <div className={`flex ${getResponsiveGap()} justify-center items-start min-w-min p-4`}>
-                    {room.config.columns.map((column, colIndex) => (
-                      <div key={column.id} className={`flex flex-col ${getResponsiveGap()}`}>
-                        {Array.from({ length: column.tables }).map((_, tableIndex) => (
-                          <div
-                            key={tableIndex}
-                            className={`relative ${getResponsiveTableSize()} rounded-lg border-2 flex items-center justify-center`}
-                            style={getTableStyle()}
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => {
-                              // Determine the first seat number in this table for the drop target
-                              const firstSeatInTable = getSeatNumber(colIndex, tableIndex, 0)
-                              handleDrop(e, firstSeatInTable)
-                            }}
-                          >
-                            <div
-                              className={`grid ${
-                                column.seatsPerTable === 1
-                                  ? "grid-cols-1"
-                                  : column.seatsPerTable === 2
-                                    ? "grid-cols-2"
-                                    : column.seatsPerTable === 3
-                                      ? "grid-cols-3"
-                                      : column.seatsPerTable === 4
-                                        ? "grid-cols-2"
-                                        : column.seatsPerTable === 6
-                                          ? "grid-cols-3"
-                                          : "grid-cols-2"
-                              } gap-3 p-4 place-items-center w-full h-full`}
-                            >
-                              {Array.from({ length: column.seatsPerTable }).map((_, seatIndex) => {
-                                const seatNumber = getSeatNumber(colIndex, tableIndex, seatIndex)
-                                const assignment = assignments.get(seatNumber)
-                                const student = assignment ? students.find((s) => s.id === assignment) : null
-                                const isOccupied = !!student
-
-                                return (
-                                  <div
-                                    key={`seat-${tableIndex}-${seatIndex}`}
-                                    data-seat-number={seatNumber}
-                                    draggable={!!student}
-                                    // Pass student.id to handleDragStart
-                                    onDragStart={(e) => student && handleDragStart(e as any, student.id)}
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, seatNumber)}
-                                    onTouchStart={(e) => student && handleTouchStart(e as any, student.id)}
-                                    onTouchMove={handleTouchMove}
-                                    onTouchEnd={(e) => handleTouchEnd(e, seatNumber)}
-                                    // Use the new handleSeatClick
-                                    onClick={() => handleSeatClick(seatNumber)}
-                                    className={cn(
-                                      "w-10 h-10 border-2 rounded flex items-center justify-center text-xs font-medium transition-all cursor-pointer",
-                                      student
-                                        ? "bg-black text-white border-black hover:scale-105"
-                                        : "bg-gray-100 text-gray-400 border-gray-300 hover:border-gray-400 hover:bg-gray-200",
-                                    )}
-                                    style={getSeatStyle(isOccupied)}
-                                  >
-                                    {student ? (
-                                      <>
-                                        <span className="text-white text-xs font-semibold">{getInitials(student)}</span>
-                                        {/* Removed direct remove button from seat for consistency with dialog */}
-                                      </>
-                                    ) : (
-                                      <span className="text-xs">{seatNumber}</span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                {!room?.config?.columns ? (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <p>Configuration de la salle non disponible</p>
                   </div>
-                </div>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <div className={`flex ${getResponsiveGap()} justify-center items-start min-w-min p-4`}>
+                      {room.config.columns.map((column, colIndex) => (
+                        <div key={column.id} className={`flex flex-col ${getResponsiveGap()}`}>
+                          {Array.from({ length: column.tables }).map((_, tableIndex) => (
+                            <div
+                              key={tableIndex}
+                              className={`relative ${getResponsiveTableSize()} rounded-lg border-2 flex items-center justify-center`}
+                              style={getTableStyle()}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => {
+                                // Determine the first seat number in this table for the drop target
+                                const firstSeatInTable = getSeatNumber(colIndex, tableIndex, 0)
+                                handleDrop(e, firstSeatInTable)
+                              }}
+                            >
+                              <div
+                                className={`grid ${
+                                  column.seatsPerTable === 1
+                                    ? "grid-cols-1"
+                                    : column.seatsPerTable === 2
+                                      ? "grid-cols-2"
+                                      : column.seatsPerTable === 3
+                                        ? "grid-cols-3"
+                                        : column.seatsPerTable === 4
+                                          ? "grid-cols-2"
+                                          : column.seatsPerTable === 6
+                                            ? "grid-cols-3"
+                                            : "grid-cols-2"
+                                } gap-3 p-4 place-items-center w-full h-full`}
+                              >
+                                {Array.from({ length: column.seatsPerTable }).map((_, seatIndex) => {
+                                  const seatNumber = getSeatNumber(colIndex, tableIndex, seatIndex)
+                                  const assignment = assignments.get(seatNumber)
+                                  const student = assignment ? students.find((s) => s.id === assignment) : null
+                                  const isOccupied = !!student
+
+                                  return (
+                                    <div
+                                      key={`seat-${tableIndex}-${seatIndex}`}
+                                      data-seat-number={seatNumber}
+                                      draggable={!!student}
+                                      // Pass student.id to handleDragStart
+                                      onDragStart={(e) => student && handleDragStart(e as any, student.id)}
+                                      onDragOver={handleDragOver}
+                                      onDrop={(e) => handleDrop(e, seatNumber)}
+                                      onTouchStart={(e) => student && handleTouchStart(e as any, student.id)}
+                                      onTouchMove={handleTouchMove}
+                                      onTouchEnd={(e) => handleTouchEnd(e, seatNumber)}
+                                      // Use the new handleSeatClick
+                                      onClick={() => handleSeatClick(seatNumber)}
+                                      className={cn(
+                                        "w-10 h-10 border-2 rounded flex items-center justify-center text-xs font-medium transition-all cursor-pointer",
+                                        student
+                                          ? "bg-black text-white border-black hover:scale-105"
+                                          : "bg-gray-100 text-gray-400 border-gray-300 hover:border-gray-400 hover:bg-gray-200",
+                                      )}
+                                      style={getSeatStyle(isOccupied)}
+                                    >
+                                      {student ? (
+                                        <>
+                                          <span className="text-white text-xs font-semibold">
+                                            {getInitials(student)}
+                                          </span>
+                                          {/* Removed direct remove button from seat for consistency with dialog */}
+                                        </>
+                                      ) : (
+                                        <span className="text-xs">{seatNumber}</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
