@@ -1605,19 +1605,20 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
             </div>
             <div>
               <Label htmlFor="password">Mot de passe</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <Input
                   id="password"
                   type="text"
                   placeholder="Laisser vide pour ne pas modifier"
                   value={accessData.password}
                   onChange={(e) => setAccessData({ ...accessData, password: e.target.value })}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="shrink-0 bg-transparent"
                   onClick={() => setAccessData({ ...accessData, password: generateRandomPassword(8) })}
                   title="Générer un mot de passe aléatoire"
                 >
@@ -1627,21 +1628,25 @@ export function TeachersManagement({ establishmentId, userRole, userId, onBack }
               <p className="text-xs text-muted-foreground mt-1">Laissez vide pour conserver le mot de passe actuel</p>
             </div>
           </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => setIsAccessDialogOpen(false)} className="w-full sm:w-auto">
-              Annuler
-            </Button>
-            <Button onClick={handleUpdateCredentials} className="w-full sm:w-auto">
-              Enregistrer
-            </Button>
-            <Button variant="secondary" onClick={handleSendCredentials} className="w-full sm:w-auto">
-              <Mail className="mr-2 h-4 w-4" />
-              Envoyer par email
-            </Button>
-            <Button variant="secondary" onClick={handleDownloadPDF} className="w-full sm:w-auto">
-              <FileText className="mr-2 h-4 w-4" />
-              Télécharger PDF
-            </Button>
+          <DialogFooter className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2 w-full">
+              <Button onClick={handleUpdateCredentials} className="w-full">
+                Enregistrer
+              </Button>
+              <Button variant="outline" onClick={() => setIsAccessDialogOpen(false)} className="w-full">
+                Annuler
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 w-full">
+              <Button variant="secondary" onClick={handleSendCredentials} className="w-full">
+                <Mail className="mr-1 h-4 w-4" />
+                <span className="truncate">Email</span>
+              </Button>
+              <Button variant="secondary" onClick={handleDownloadPDF} className="w-full">
+                <FileText className="mr-1 h-4 w-4" />
+                <span className="truncate">PDF</span>
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
