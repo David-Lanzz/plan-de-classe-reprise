@@ -464,6 +464,12 @@ export function SeatingPlanEditor({
     setIsSubmitting(true)
 
     try {
+      const proposalId = subRoom.proposal_data?.id
+
+      if (!proposalId) {
+        throw new Error("ID de proposition manquant")
+      }
+
       const supabase = createClient()
 
       const { error } = await supabase
@@ -472,7 +478,7 @@ export function SeatingPlanEditor({
           status: "submitted",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", subRoom.id)
+        .eq("id", proposalId)
 
       if (error) throw error
 
