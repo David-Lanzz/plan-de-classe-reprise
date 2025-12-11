@@ -21,7 +21,19 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useAuth } from "@/lib/use-auth"
-import { Plus, MoreVertical, Copy, Trash, Edit, Search, Eye, X, LayoutTemplate, Sparkles } from "lucide-react"
+import {
+  ArrowLeft,
+  Plus,
+  MoreVertical,
+  Copy,
+  Trash,
+  Edit,
+  Search,
+  Eye,
+  X,
+  LayoutTemplate,
+  Sparkles,
+} from "lucide-react"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { TemplateSelectionDialog } from "@/components/template-selection-dialog"
 import { CreateTemplateDialog } from "@/components/create-template-dialog"
@@ -70,17 +82,6 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
   const [creationMode, setCreationMode] = useState<"template" | "custom" | null>(null)
   const [isCreateSubRoomDialogOpen, setIsCreateSubRoomDialogOpen] = useState(false)
   const [preselectedRoomId, setPreselectedRoomId] = useState<string | null>(null)
-
-  // Detect mobile device for conditional rendering
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    window.addEventListener("resize", handleResize)
-    handleResize() // Initial check
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
 
   const [formData, setFormData] = useState({
     name: "",
@@ -453,75 +454,47 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="container mx-auto p-6 max-w-7xl">
-        {/* Moved title and sub-room creation button to top */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              Gestion des Salles
-            </h1>
-            {canModifyRooms && !isMobile && (
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => setIsCreateSubRoomDialogOpen(true)}
-                  size="lg"
-                  variant="outline"
-                  className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0 hover:from-indigo-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all"
-                >
-                  <Plus className="mr-2 h-5 w-5" />
-                  Créer une sous-salle
-                </Button>
-                <Button
-                  onClick={() => setIsCreateTemplateDialogOpen(true)}
-                  size="lg"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all"
-                >
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Personnaliser
-                </Button>
-              </div>
-            )}
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="hover:bg-white/50 dark:hover:bg-slate-800/50"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                Gestion des salles
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {rooms.length} salle{rooms.length > 1 ? "s" : ""} • {filteredRooms.length} affichée
+                {filteredRooms.length > 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LayoutTemplate className="h-5 w-5" />
-                Créer une nouvelle salle
-              </CardTitle>
-              <CardDescription>Utilisez un template prédéfini ou créez une configuration personnalisée</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={() => setIsCreateTemplateDialogOpen(true)}
-                  size="lg"
-                  variant="outline"
-                  className="border-purple-300 hover:bg-purple-50 hover:border-purple-400 dark:border-purple-700 dark:hover:bg-purple-900/20"
-                >
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Créer un template
-                </Button>
-                <Button
-                  onClick={() => setIsTemplateDialogOpen(true)}
-                  size="lg"
-                  variant="outline"
-                  className="border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-900/20"
-                >
-                  <LayoutTemplate className="mr-2 h-5 w-5" />
-                  Templates
-                </Button>
-                <Button
-                  onClick={handleCustomCreation}
-                  size="lg"
-                  variant="outline"
-                  className="border-blue-300 hover:bg-blue-50 hover:border-blue-400 dark:border-blue-700 dark:hover:bg-blue-900/20 bg-transparent"
-                >
-                  <Plus className="mr-2 h-5 w-5" />
-                  Personnalisée
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {canModifyRooms && (
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setIsTemplateDialogOpen(true)}
+                size="lg"
+                variant="outline"
+                className="border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-900/20"
+              >
+                <LayoutTemplate className="mr-2 h-5 w-5" />
+                Templates
+              </Button>
+              <Button
+                onClick={handleCustomCreation}
+                size="lg"
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all"
+              >
+                <Sparkles className="mr-2 h-5 w-5" />
+                Personnaliser
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="mb-6">
@@ -955,7 +928,6 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
             </DialogContent>
           </Dialog>
 
-          {/* This card is now positioned after the search and selection bar */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

@@ -56,7 +56,6 @@ export function CreateProposalDialog({
   const [subRooms, setSubRooms] = useState<SubRoom[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [classId, setClassId] = useState<string>("")
-  const [profileId, setProfileId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
 
   const supabase = createBrowserClient(
@@ -81,15 +80,10 @@ export function CreateProposalDialog({
 
   async function fetchData() {
     try {
-      const { data: studentData } = await supabase
-        .from("students")
-        .select("class_id, profile_id")
-        .eq("profile_id", userId)
-        .single()
+      const { data: studentData } = await supabase.from("students").select("class_id").eq("profile_id", userId).single()
 
       if (studentData) {
         setClassId(studentData.class_id)
-        setProfileId(studentData.profile_id)
 
         const { data: teacherClassData } = await supabase
           .from("teacher_classes")
@@ -110,6 +104,7 @@ export function CreateProposalDialog({
         }
       }
 
+      // Fetch rooms
       const { data: roomsData } = await supabase
         .from("rooms")
         .select("id, name, code")
@@ -166,15 +161,6 @@ export function CreateProposalDialog({
       return
     }
 
-    if (!profileId) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'identifier votre profil",
-        variant: "destructive",
-      })
-      return
-    }
-
     if (useExistingSubRoom && !selectedSubRoomId) {
       toast({
         title: "Erreur",
@@ -204,17 +190,17 @@ export function CreateProposalDialog({
         if (subRoom) {
           seatAssignments = subRoom.seat_assignments || {}
 
+          // Get room_id from the sub_room
           roomId = subRoom.room_id
         }
       }
 
-      console.log("[v0] Creating proposal with profile_id:", profileId)
       const { error } = await supabase.from("sub_room_proposals").insert({
         name,
         room_id: roomId,
         class_id: classId,
         teacher_id: selectedTeacherId,
-        proposed_by: profileId,
+        proposed_by: userId,
         establishment_id: establishmentId,
         status: "pending",
         seat_assignments: seatAssignments,
@@ -228,6 +214,7 @@ export function CreateProposalDialog({
         description: "Proposition créée avec succès",
       })
 
+      // Reset form
       setName("")
       setSelectedRoomId("")
       setSelectedSubRoomId("")
