@@ -22,22 +22,26 @@ interface Notification {
 
 interface NotificationsDropdownProps {
   userId: string
+  establishmentId?: string
 }
 
-export function NotificationsDropdown({ userId }: NotificationsDropdownProps) {
+export function NotificationsDropdown({ userId, establishmentId }: NotificationsDropdownProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
 
   const fetchNotifications = async () => {
+    console.log("[v0] Fetching notifications for user:", userId, "establishment:", establishmentId)
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10)
+
+    let query = supabase.from("notifications").select("*").eq("user_id", userId)
+
+    if (establishmentId) {
+      query = query.eq("establishment_id", establishmentId)
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(10)
 
     if (error) {
       console.error("[v0] Error fetching notifications:", error)
@@ -54,7 +58,7 @@ export function NotificationsDropdown({ userId }: NotificationsDropdownProps) {
     // Refresh every 30 seconds
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
-  }, [userId])
+  }, [userId, establishmentId])
 
   const handleMarkAsRead = async (notificationId: string) => {
     const supabase = createClient()
