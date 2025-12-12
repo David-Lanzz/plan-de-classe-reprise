@@ -20,7 +20,7 @@ interface TemplateSelectionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectTemplate: (template: RoomTemplate) => void
-  userId?: string // Made optional to prevent undefined errors
+  userId: string
   establishmentId: string
 }
 

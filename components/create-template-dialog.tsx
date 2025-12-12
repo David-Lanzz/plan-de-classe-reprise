@@ -22,7 +22,7 @@ interface CreateTemplateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
-  userId?: string
+  userId: string
   establishmentId: string
 }
 
@@ -68,15 +68,6 @@ export function CreateTemplateDialog({
       toast({
         title: "Erreur",
         description: "Le nom du template est requis",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!userId) {
-      toast({
-        title: "Erreur",
-        description: "Utilisateur non authentifié",
         variant: "destructive",
       })
       return

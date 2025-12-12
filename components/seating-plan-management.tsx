@@ -425,13 +425,13 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
               </p>
             </div>
           </div>
-          {canCreateSubRooms && (
+          {canCreateSubRooms && userRole !== "delegue" && userRole !== "eco-delegue" && (
             <Button
               onClick={() => setIsCreateDialogOpen(true)}
               size="lg"
               className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all"
             >
-              <Plus className="h-5 w-5 mr-2" />
+              <Plus className="mr-2 h-5 w-5" />
               Créer une sous-salle
             </Button>
           )}
@@ -603,7 +603,7 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
               onClick={() => openDeleteDialog(selectedSubRoomIds)}
               className="shadow-xl"
             >
-              <Trash2 className="h-5 w-5 mr-2" />
+              <Trash2 className="mr-2 h-5 w-5" />
               Supprimer {selectedSubRoomIds.length} sous-salle(s)
             </Button>
           </div>
