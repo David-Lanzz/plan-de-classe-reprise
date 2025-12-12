@@ -9,8 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { ArrowLeft, Plus, Search, Users, BookOpen, Trash2 } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import type { UserRole } from "@/lib/types"
 import { SeatingPlanEditor } from "@/components/seating-plan-editor"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
@@ -393,16 +391,9 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
   }
 
   const toggleSubRoomSelection = (subRoomId: string) => {
-    if (userRole === "eleve") {
-      return
-    }
     setSelectedSubRoomIds((prev) =>
       prev.includes(subRoomId) ? prev.filter((id) => id !== subRoomId) : [...prev, subRoomId],
     )
-  }
-
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedSubRoomIds(checked ? subRooms.map((room) => room.id) : [])
   }
 
   const isVieScolaire = userRole === "vie-scolaire"
@@ -411,8 +402,6 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
 
   const filterTeachers = userRole === "professeur" ? teachers.filter((t) => t.id === userId) : teachers
   const filterClasses = userRole === "delegue" || userRole === "eco-delegue" ? availableClasses : classes
-
-  const canSelectSubRooms = userRole !== "student" && userRole !== "eleve"
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
@@ -515,13 +504,12 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
             <Card key={subRoom.id} className="overflow-hidden hover:shadow-lg transition-shadow relative">
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
-                  {canSelectSubRooms && (
-                    <Checkbox
-                      checked={selectedSubRoomIds.includes(subRoom.id)}
-                      onCheckedChange={() => toggleSubRoomSelection(subRoom.id)}
-                      className="w-5 h-5 mt-1 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
-                    />
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={selectedSubRoomIds.includes(subRoom.id)}
+                    onChange={() => toggleSubRoomSelection(subRoom.id)}
+                    className="w-5 h-5 mt-1 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                  />
                   <div className="flex-1">
                     <CardTitle className="text-lg">{subRoom.name}</CardTitle>
                     <CardDescription className="mt-1 text-sm">{subRoom.description}</CardDescription>
@@ -583,25 +571,6 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
           </Card>
         )}
 
-        {canSelectSubRooms && subRooms.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={selectedSubRoomIds.length === subRooms.length}
-              onCheckedChange={handleSelectAll}
-              id="select-all"
-            />
-            <Label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
-              Sélectionner toutes les sous-salles
-            </Label>
-            {selectedSubRoomIds.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={() => setIsDeleteDialogOpen(true)} className="ml-auto">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Supprimer ({selectedSubRoomIds.length})
-              </Button>
-            )}
-          </div>
-        )}
-
         <CreateSubRoomDialog
           open={isCreateDialogOpen}
           onOpenChange={setIsCreateDialogOpen}
@@ -626,7 +595,7 @@ export function SeatingPlanManagement({ establishmentId, userRole, userId, onBac
           />
         )}
 
-        {selectedSubRoomIds.length > 0 && canSelectSubRooms && (
+        {selectedSubRoomIds.length > 0 && (
           <div className="fixed bottom-6 right-6 z-50">
             <Button
               variant="destructive"

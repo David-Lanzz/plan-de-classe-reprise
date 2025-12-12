@@ -33,6 +33,9 @@ import {
   X,
   LayoutTemplate,
   Sparkles,
+  Grid3x3,
+  LayoutGrid,
+  Trash2,
 } from "lucide-react"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { TemplateSelectionDialog } from "@/components/template-selection-dialog"
@@ -498,7 +501,7 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
               </p>
             </div>
           </div>
-          {(isVieScolaire || isTeacher) && (
+          {canModifyRooms && (
             <div className="flex gap-3">
               <Button
                 onClick={() => setIsTemplateDialogOpen(true)}
@@ -521,75 +524,96 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
           )}
         </div>
 
-        {/* Search filter */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               type="text"
-              placeholder="Rechercher une salle..."
+              placeholder="Rechercher une salle par nom ou code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white dark:bg-slate-800"
+              className="pl-10"
             />
           </div>
         </div>
 
-        <Card className="border-2 border-dashed border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Plus className="h-5 w-5 text-emerald-600" />
-              Créer une nouvelle salle
-            </CardTitle>
-            <CardDescription>
-              {isVieScolaire || isTeacher
-                ? "Utilisez un template prédéfini ou créez une configuration personnalisée"
-                : "Consultez les templates disponibles ou suggérez une nouvelle configuration"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex gap-2">
-            <Button
-              onClick={() => setIsTemplateDialogOpen(true)}
-              variant="outline"
-              size="sm"
-              className="flex-1 border-emerald-300 hover:bg-emerald-50 dark:border-emerald-700 dark:hover:bg-emerald-900/20"
-            >
-              <LayoutTemplate className="mr-2 h-4 w-4" />
-              Templates
-            </Button>
-            {(isVieScolaire || isTeacher) && (
-              <Button
-                onClick={handleCustomCreation}
-                size="sm"
-                className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Personnalisée
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {filteredRooms.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <p className="text-lg text-muted-foreground mb-2">
-                {searchQuery
-                  ? "Aucune salle ne correspond à votre recherche"
-                  : "Commencez par créer votre première salle"}
-              </p>
-              {(isVieScolaire || isTeacher) && !searchQuery && (
+        {canModifyRooms && (
+          <Card className="mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl text-emerald-900 dark:text-emerald-100">
+                Créer une nouvelle salle
+              </CardTitle>
+              <CardDescription>Utilisez un template prédéfini ou créez une configuration personnalisée</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => setIsCreateTemplateDialogOpen(true)}
+                  variant="outline"
+                  className="flex-1 h-20 border-2 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                >
+                  <Plus className="mr-2 h-5 w-5" />
+                  Créer un template
+                </Button>
+                <Button
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  variant="outline"
+                  className="flex-1 h-20 border-2 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                >
+                  <Grid3x3 className="mr-2 h-5 w-5" />
+                  Templates
+                </Button>
                 <Button
                   onClick={handleCustomCreation}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  className="flex-1 h-20 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Créer une salle
+                  <LayoutGrid className="mr-2 h-5 w-5" />
+                  Personnalisée
                 </Button>
-              )}
+              </div>
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {canModifyRooms && (
+          <div className="mb-6 flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <Checkbox
+                checked={selectedRoomIds.length === filteredRooms.length && filteredRooms.length > 0}
+                onCheckedChange={handleSelectAll}
+                className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+              />
+              <Label className="text-sm cursor-pointer font-medium" onClick={handleSelectAll}>
+                Tout sélectionner
+              </Label>
+            </div>
+          </div>
+        )}
+
+        {selectedRoomIds.length > 0 && canModifyRooms && (
+          <div className="flex gap-2 animate-in slide-in-from-top-2 duration-300 mb-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDuplicateRooms(selectedRoomIds)}
+              className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Dupliquer ({selectedRoomIds.length})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openDeleteDialog(selectedRoomIds)}
+              className="border-red-300 text-red-700 hover:bg-red-50 bg-transparent"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Supprimer ({selectedRoomIds.length})
+            </Button>
+          </div>
+        )}
+
+        {filteredRooms.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredRooms.map((room) => {
               const columns = Array.isArray(room.config?.columns) && room.config.columns ? room.config.columns : []
@@ -672,6 +696,31 @@ export function RoomsManagement({ rooms: initialRooms, establishmentId }: RoomsM
               )
             })}
           </div>
+        ) : (
+          <Card className="bg-white/50 dark:bg-slate-800/50 backdrop-blur border-dashed border-2 border-emerald-300 dark:border-emerald-700">
+            <CardContent className="py-16 text-center">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto mb-4">
+                <Search className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">
+                {searchQuery ? "Aucune salle trouvée" : "Aucune salle créée"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery
+                  ? "Aucune salle ne correspond à votre recherche"
+                  : "Commencez par créer votre première salle"}
+              </p>
+              {canModifyRooms && !searchQuery && (
+                <Button
+                  onClick={handleCustomCreation}
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Créer une salle
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {viewedRoom && (
