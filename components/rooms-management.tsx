@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { SimpleMenu, SimpleMenuItem } from "@/components/ui/simple-menu"
 import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/use-auth"
 import { ErrorBoundary } from "./error-boundary"
@@ -683,8 +683,9 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                       />
                     )}
                     <div className="flex-1" />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                    <SimpleMenu
+                      align="end"
+                      trigger={
                         <button
                           type="button"
                           className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground"
@@ -693,47 +694,46 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                           <MoreVertical className="h-4 w-4" />
                           <span className="sr-only">Menu</span>
                         </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleViewRoom(room)
-                          }}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Voir
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDuplicateRooms([room.id])
-                          }}
-                        >
-                          <Copy className="mr-2 h-4 w-4" />
-                          Dupliquer
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openEditDialog(room)
-                          }}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openDeleteDialog([room.id])
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash className="mr-2 h-4 w-4" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      }
+                    >
+                      <SimpleMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleViewRoom(room)
+                        }}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Voir
+                      </SimpleMenuItem>
+                      <SimpleMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDuplicateRooms([room.id])
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Dupliquer
+                      </SimpleMenuItem>
+                      <SimpleMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openEditDialog(room)
+                        }}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Modifier
+                      </SimpleMenuItem>
+                      <SimpleMenuItem
+                        destructive
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDeleteDialog([room.id])
+                        }}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Supprimer
+                      </SimpleMenuItem>
+                    </SimpleMenu>
                   </div>
                   <div className="space-y-2">
                     <h3 className="font-bold text-lg text-slate-900 dark:text-white">{room.name}</h3>
