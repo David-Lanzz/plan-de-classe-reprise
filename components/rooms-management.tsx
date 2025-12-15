@@ -113,8 +113,7 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
   const isDelegate = effectiveUserRole === "delegue_adjoint"
   const isTeacher = effectiveUserRole === "professeur"
 
-  const canModifyRooms =
-    effectiveUserRole === "professeur" || effectiveUserRole === "vie_scolaire" || effectiveUserRole === "admin"
+  const canModifyRooms = userRole === "professeur" || userRole === "vie-scolaire" || userRole === "admin"
 
   console.log("[v0] RoomsManagement - Permissions:", {
     userRole: effectiveUserRole,
@@ -660,10 +659,12 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Grille des salles */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredRooms.map((room) => {
-            const columns = room.config?.columns || []
-            const totalSeats = columns.reduce((total, col) => total + (col.tables || 0) * (col.seatsPerTable || 0), 0)
+            const columns = room.config?.columns
+            const safeColumns = Array.isArray(columns) ? columns : []
+            const totalSeats = safeColumns.reduce((acc, col) => acc + (col?.tables || 0) * (col?.seatsPerTable || 0), 0)
 
             return (
               <Card
@@ -683,12 +684,15 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                     )}
                     <div className="flex-1" />
                     <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">Menu</span>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                          <span className="sr-only">Menu</span>
+                        </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem
@@ -738,7 +742,7 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                         {room.code}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {(Array.isArray(columns) ? columns : []).length} col. • {totalSeats} places
+                        {safeColumns.length} col. • {totalSeats} places
                       </span>
                     </div>
                   </div>
@@ -789,73 +793,31 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
           </Card>
         )}
 
-        {viewedRoom &&
-        viewedRoom.config?.columns &&
-        Array.isArray(viewedRoom.config.columns) &&
-        viewedRoom.config.columns.length > 0 ? (
-          <ErrorBoundary
-            componentName="Visualisation de la salle"
-            fallback={
-              <Card className="mb-6 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <p className="text-red-700 dark:text-red-300 mb-4">
-                      Impossible d'afficher cette salle. Les données semblent corrompues.
-                    </p>
-                    <Button onClick={() => setViewedRoom(null)} variant="outline">
-                      Fermer
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            }
-          >
-            <Card className="mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 shadow-xl animate-in slide-in-from-bottom-4 duration-500">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{viewedRoom.name}</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Code: {viewedRoom.code}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setViewedRoom(null)}
-                      className="border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Fermer
-                    </Button>
-                    {canModifyRooms && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(viewedRoom)}
-                          className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Modifier
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPreselectedRoomId(viewedRoom.id)}
-                          className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Créer sous-salle
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <RoomVisualization room={viewedRoom} />
-              </CardContent>
-            </Card>
-          </ErrorBoundary>
-        ) : null}
+        {viewedRoom && (
+          <Dialog open={!!viewedRoom} onOpenChange={(open) => !open && setViewedRoom(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{viewedRoom.name}</DialogTitle>
+                <DialogDescription>Code: {viewedRoom.code}</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                {viewedRoom.config &&
+                viewedRoom.config.columns &&
+                Array.isArray(viewedRoom.config.columns) &&
+                viewedRoom.config.columns.length > 0 ? (
+                  <RoomVisualization room={viewedRoom} />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">Configuration de salle non disponible</div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewedRoom(null)}>
+                  Fermer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
