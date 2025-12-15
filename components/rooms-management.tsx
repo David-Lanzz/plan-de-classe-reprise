@@ -113,7 +113,8 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
   const isDelegate = effectiveUserRole === "delegue_adjoint"
   const isTeacher = effectiveUserRole === "professeur"
 
-  const canModifyRooms = true
+  const canModifyRooms =
+    effectiveUserRole === "professeur" || effectiveUserRole === "vie_scolaire" || effectiveUserRole === "admin"
 
   console.log("[v0] RoomsManagement - Permissions:", {
     userRole: effectiveUserRole,
@@ -640,7 +641,7 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                   variant="outline"
                   size="sm"
                   onClick={() => handleDuplicateRooms(selectedRoomIds)}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:hover:bg-emerald-900/20"
                 >
                   <Copy className="mr-2 h-4 w-4" />
                   Dupliquer ({selectedRoomIds.length})
@@ -682,10 +683,10 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                     )}
                     <div className="flex-1" />
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild={false}>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                           onClick={(e) => e.stopPropagation()}
                         >

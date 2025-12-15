@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Check, X, Clock, CheckCircle2, XCircle } from "lucide-react"
+import { Check, X, Clock, CheckCircle2, XCircle, ArrowLeft } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { toast } from "@/components/ui/use-toast"
 import { notifyProposalStatusChange } from "@/lib/notifications"
@@ -276,7 +276,6 @@ export function ReviewProposalDialog({
         title: "Erreur",
         description: "Veuillez indiquer des commentaires pour le délégué",
         variant: "destructive",
-        className: "z-[9999]",
       })
       return
     }
@@ -296,6 +295,7 @@ export function ReviewProposalDialog({
           teacher_comments: returnComments,
           reviewed_by: userId,
           reviewed_at: new Date().toISOString(),
+          is_submitted: false,
         })
         .eq("id", proposal.id)
 
@@ -318,7 +318,6 @@ export function ReviewProposalDialog({
       toast({
         title: "Proposition renvoyée",
         description: "Le délégué a été notifié et peut maintenant modifier la proposition",
-        className: "z-[9999]",
       })
 
       onSuccess()
@@ -330,7 +329,6 @@ export function ReviewProposalDialog({
         title: "Erreur",
         description: error.message || "Impossible de renvoyer la proposition",
         variant: "destructive",
-        className: "z-[9999]",
       })
     } finally {
       setIsLoading(false)
@@ -468,6 +466,9 @@ export function ReviewProposalDialog({
                 <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                   Cette proposition est en attente de validation
                 </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  Vous pouvez valider, renvoyer avec commentaires pour modification, ou refuser définitivement.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -479,6 +480,9 @@ export function ReviewProposalDialog({
                   onChange={(e) => setReturnComments(e.target.value)}
                   rows={3}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Le délégué pourra modifier la proposition et la resoumettre
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -490,6 +494,7 @@ export function ReviewProposalDialog({
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={3}
                 />
+                <p className="text-xs text-muted-foreground">La proposition sera définitivement rejetée</p>
               </div>
 
               <div className="flex gap-2">
@@ -499,6 +504,7 @@ export function ReviewProposalDialog({
                   disabled={isLoading || !returnComments.trim()}
                   className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-50 bg-transparent"
                 >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
                   {isLoading && action === "return" ? "Renvoi..." : "Renvoyer avec commentaires"}
                 </Button>
                 <Button
