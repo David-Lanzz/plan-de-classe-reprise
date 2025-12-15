@@ -686,14 +686,16 @@ export function RoomsManagement({ rooms, establishmentId, userRole, userId, onBa
                     <SimpleMenu
                       align="end"
                       trigger={
-                        <button
+                        <Button
                           type="button"
-                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
                           <span className="sr-only">Menu</span>
-                        </button>
+                        </Button>
                       }
                     >
                       <SimpleMenuItem
