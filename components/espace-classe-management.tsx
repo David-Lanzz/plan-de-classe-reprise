@@ -34,7 +34,7 @@ interface EspaceClasseManagementProps {
   establishmentId: string
 }
 
-export default function EspaceClasseManagement({
+export function EspaceClasseManagement({
   initialRooms,
   userRole,
   userId,

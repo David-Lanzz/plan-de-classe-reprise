@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import EspaceClasseManagement from "@/components/espace-classe-management"
+import { EspaceClasseManagement } from "@/components/espace-classe-management"
 
 export default async function EspaceClassePage() {
   const supabase = await createClient()

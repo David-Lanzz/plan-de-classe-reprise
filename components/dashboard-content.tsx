@@ -27,6 +27,7 @@ import { TeachersManagement } from "@/components/teachers-management"
 import { ClassesManagement } from "@/components/classes-management"
 import { SeatingPlanManagement } from "@/components/seating-plan-management"
 import { NotificationsDropdown } from "@/components/notifications-dropdown"
+import { EspaceClasseManagement } from "@/components/espace-classe-management"
 
 interface DashboardContentProps {
   user: User
@@ -287,58 +288,12 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   if (activeSection === "espace-classe") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="container mx-auto p-6 max-w-7xl">
-          <header className="mb-8">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full ${getUserGradientClass()} flex items-center justify-center`}>
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{getUserTypeLabel()}</h1>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {profile.first_name} {profile.last_name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 items-center">
-                <NotificationsDropdown userId={profile.id} establishmentId={profile.establishment_id} />
-                <Button
-                  variant="outline"
-                  onClick={openSettings}
-                  className="hover:bg-slate-50 hover:border-slate-300 transition-all bg-transparent"
-                >
-                  <SettingsIcon className="mr-2 h-4 w-4" />
-                  Paramètres
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className="hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all bg-transparent"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {isLoggingOut ? "Déconnexion..." : "Déconnexion"}
-                </Button>
-              </div>
-            </div>
-          </header>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            <Card className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4">Espace Classe</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Vous pouvez ici gérer les plans de classe de votre établissement.
-              </p>
-            </Card>
-          </motion.div>
-        </div>
-      </div>
+      <EspaceClasseManagement
+        establishmentId={profile.establishment_id}
+        userRole={profile.role}
+        userId={profile.id}
+        onBack={() => setActiveSection("home")}
+      />
     )
   }
 
