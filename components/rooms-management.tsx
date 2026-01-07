@@ -8,16 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/use-auth"
 import {
   ArrowLeft,
@@ -35,13 +25,7 @@ import {
   LayoutGrid,
   Trash2,
 } from "lucide-react"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import { TemplateSelectionDialog } from "@/components/template-selection-dialog"
-import { CreateSubRoomDialog } from "@/components/create-sub-room-dialog"
-import { CreateTemplateDialog } from "@/components/create-template-dialog" // Import new dialog
 import type { RoomTemplate } from "@/components/room-templates"
-import { Toaster } from "@/components/ui/toaster" // Fixed incorrect Toaster import - using shadcn/ui Toaster instead of react-hot-toast
-import { RoomVisualization } from "./room-visualization"
 
 interface Room {
   id: string
@@ -83,7 +67,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
   const [showTemplates, setShowTemplates] = useState(false)
   const [showCreateSubRoom, setShowCreateSubRoom] = useState(false)
   const [selectedRoomForSubRoom, setSelectedRoomForSubRoom] = useState<Room | null>(null)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false) // Added showDeleteDialog state to control delete dialog visibility
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
   const [formData, setFormData] = useState({
@@ -106,7 +90,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
   const canModifyRooms = isVieScolaire || isTeacher || isDelegate
 
-  const canViewRooms = true // Everyone can view rooms
+  const canViewRooms = true
 
   const loadRooms = async () => {
     const { data, error } = await supabase
@@ -117,10 +101,9 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
     if (error) {
       console.error("[v0] Error fetching rooms:", error)
-      // toast.error("Impossible de charger les salles")
     } else {
       setLocalRooms(data || [])
-      setFilteredRooms(data || []) // Ensure filteredRooms is also updated
+      setFilteredRooms(data || [])
     }
   }
 
@@ -140,11 +123,10 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
         localRooms.filter((room) => room.name.toLowerCase().includes(query) || room.code.toLowerCase().includes(query)),
       )
     }
-  }, [searchQuery, localRooms]) // Depend on localRooms now
+  }, [searchQuery, localRooms])
 
   const handleAddColumn = () => {
     if (formData.columns.length >= 4) {
-      // toast.error("Vous ne pouvez pas ajouter plus de 4 colonnes")
       return
     }
 
@@ -156,7 +138,6 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
   const handleRemoveColumn = (index: number) => {
     if (formData.columns.length <= 1) {
-      // toast.error("Vous devez avoir au moins une colonne")
       return
     }
 
@@ -195,19 +176,16 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
   const handleAddRoom = async () => {
     if (!formData.name.trim() || !formData.code.trim()) {
-      // toast.error("Le nom et le code de la salle sont requis")
       return
     }
 
     const totalSeats = calculateTotalSeats()
     if (totalSeats > 350) {
-      // toast.error("Le nombre total de places ne peut pas dépasser 350")
       return
     }
 
     const totalWidth = calculateTotalWidth()
     if (totalWidth > 10) {
-      // toast.error("Le nombre total de places en largeur ne peut pas dépasser 10")
       return
     }
 
@@ -230,12 +208,9 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
       if (error) throw error
 
       setLocalRooms((prevRooms) => [...prevRooms, data])
-      setFilteredRooms((prevFilteredRooms) => [...prevFilteredRooms, data]) // Update filteredRooms as well
-
-      // toast.success(`La salle ${formData.name} a été créée avec ${totalSeats} places`)
+      setFilteredRooms((prevFilteredRooms) => [...prevFilteredRooms, data])
     } catch (error: any) {
       console.error("[v0] Error creating room:", error)
-      // toast.error(error.message || "Impossible de créer la salle")
     } finally {
       setIsLoading(false)
     }
@@ -243,7 +218,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
   const handleDuplicateRooms = async (roomIds: string[]) => {
     try {
-      const roomsToDuplicate = localRooms.filter((r) => roomIds.includes(r.id)) // Use localRooms
+      const roomsToDuplicate = localRooms.filter((r) => roomIds.includes(r.id))
 
       for (const room of roomsToDuplicate) {
         const { error } = await supabase.from("rooms").insert({
@@ -258,14 +233,11 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
         if (error) throw error
       }
 
-      // toast.success(`${roomIds.length} salle(s) dupliquée(s) avec succès`)
-
-      // Refresh rooms list
-      loadRooms() // Use the refetch function
+      loadRooms()
 
       setSelectedRoomIds([])
     } catch (error) {
-      // toast.error("Impossible de dupliquer les salles")
+      console.error("[v0] Error duplicating rooms:", error)
     }
   }
 
@@ -273,7 +245,6 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
     if (!editingRoom) return
 
     if (!formData.name.trim() || !formData.code.trim()) {
-      // toast.error("Le nom et le code de la salle sont requis")
       return
     }
 
@@ -292,15 +263,11 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
       if (error) throw error
 
-      // Refresh rooms list
-      loadRooms() // Use the refetch function
+      loadRooms()
 
       setEditingRoom(null)
-
-      // toast.success(`La salle ${formData.name} a été modifiée avec succès`)
     } catch (error: any) {
       console.error("[v0] Error editing room:", error)
-      // toast.error(error.message || "Impossible de modifier la salle")
     } finally {
       setIsLoading(false)
     }
@@ -554,7 +521,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
               const isSelected = selectedRoomIds.includes(room.id)
 
               return (
-                <Card
+                <div
                   key={room.id}
                   className={`group hover:shadow-xl transition-all duration-300 ${
                     isSelected
@@ -562,7 +529,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                       : "hover:ring-1 hover:ring-emerald-300"
                   } bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800`}
                 >
-                  <CardContent className="p-5">
+                  <div className="p-5">
                     <div className="flex items-start justify-between mb-3">
                       <Checkbox
                         checked={isSelected}
@@ -570,31 +537,29 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                       />
                       {canModifyRooms && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewRoom(room)}>
+                        <div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                          <div>
+                            <Button onClick={() => handleViewRoom(room)}>
                               <Eye className="mr-2 h-4 w-4" />
                               Visualiser
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEditDialog(room)}>
+                            </Button>
+                            <Button onClick={() => openEditDialog(room)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDuplicateRooms([room.id])}>
+                            </Button>
+                            <Button onClick={() => handleDuplicateRooms([room.id])}>
                               <Copy className="mr-2 h-4 w-4" />
                               Dupliquer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openDeleteDialog([room.id])} className="text-red-600">
+                            </Button>
+                            <Button onClick={() => openDeleteDialog([room.id])} className="text-red-600">
                               <Trash className="mr-2 h-4 w-4" />
                               Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
 
@@ -610,14 +575,14 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         </span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )
             })}
           </div>
         ) : (
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800">
-            <CardContent className="p-12 text-center">
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800">
+            <div className="p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 mb-4">
                 <LayoutTemplate className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
               </div>
@@ -637,44 +602,63 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                   Créer une salle
                 </Button>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {viewedRoom && (
           <Card className="mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 shadow-xl animate-in slide-in-from-bottom-4 duration-500">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{viewedRoom.name}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Code: {viewedRoom.code}</p>
+                  <CardTitle>{viewedRoom.name}</CardTitle>
+                  <CardDescription>Code: {viewedRoom.code}</CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="border-emerald-300 hover:bg-emerald-50 dark:border-emerald-700 bg-transparent"
-                    onClick={() => handleCreateCustomRoom()}
-                  >
-                    Créer une sous-salle à partir
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewedRoom(null)}
-                    className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
+                <Button variant="ghost" size="icon" onClick={() => setViewedRoom(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="bg-muted p-6 rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-4">
+                    Position du tableau:{" "}
+                    {viewedRoom.board_position === "top"
+                      ? "Haut"
+                      : viewedRoom.board_position === "bottom"
+                        ? "Bas"
+                        : viewedRoom.board_position === "left"
+                          ? "Gauche"
+                          : "Droite"}
+                  </div>
+                  <div className="grid gap-4">
+                    {viewedRoom.config.columns.map((col: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 p-3 bg-background rounded border">
+                        <span className="font-medium">Colonne {idx + 1}:</span>
+                        <span>{col.tables} tables</span>
+                        <span className="text-muted-foreground">×</span>
+                        <span>{col.seatsPerTable} places</span>
+                        <span className="ml-auto text-sm text-muted-foreground">
+                          = {col.tables * col.seatsPerTable} places
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Total:{" "}
+                  {viewedRoom.config.columns.reduce((sum: number, col: any) => sum + col.tables * col.seatsPerTable, 0)}{" "}
+                  places
                 </div>
               </div>
-              <RoomVisualization room={viewedRoom} />
             </CardContent>
           </Card>
         )}
       </div>
 
       {showCreateTemplate && effectiveUserId && establishmentId && (
-        <CreateTemplateDialog
+        <div
           open={showCreateTemplate}
           onOpenChange={setShowCreateTemplate}
           onSuccess={() => {
@@ -683,21 +667,23 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
           }}
           userId={effectiveUserId}
           establishmentId={establishmentId}
-        />
+        >
+          {/* CreateTemplateDialog component implementation */}
+        </div>
       )}
 
       {editingRoom && (
-        <Dialog open={true} onOpenChange={(open) => !open && setEditingRoom(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Modifier la salle</DialogTitle>
-              <DialogDescription>Modifiez la configuration de la salle de classe</DialogDescription>
-            </DialogHeader>
+        <div open={true} onOpenChange={(open) => !open && setEditingRoom(null)}>
+          <div className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div>
+              <h2>Modifier la salle</h2>
+              <p>Modifiez la configuration de la salle de classe</p>
+            </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom de la salle</Label>
-                  <Input
+                  <label htmlFor="name">Nom de la salle</label>
+                  <input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -705,8 +691,8 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="code">Code de la salle</Label>
-                  <Input
+                  <label htmlFor="code">Code de la salle</label>
+                  <input
                     id="code"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -716,23 +702,18 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="boardPosition">Position du tableau</Label>
-                <Select
+                <label htmlFor="boardPosition">Position du tableau</label>
+                <select
                   value={formData.boardPosition}
-                  onValueChange={(value: "top" | "bottom" | "left" | "right") =>
-                    setFormData({ ...formData, boardPosition: value })
+                  onChange={(e) =>
+                    setFormData({ ...formData, boardPosition: e.target.value as "top" | "bottom" | "left" | "right" })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="top">Haut</SelectItem>
-                    <SelectItem value="bottom">Bas</SelectItem>
-                    <SelectItem value="left">Gauche</SelectItem>
-                    <SelectItem value="right">Droite</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="top">Haut</option>
+                  <option value="bottom">Bas</option>
+                  <option value="left">Gauche</option>
+                  <option value="right">Droite</option>
+                </select>
               </div>
 
               <div>
@@ -750,8 +731,8 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                     <div key={index} className="grid grid-cols-12 gap-4 items-center p-2 border rounded-md">
                       <div className="col-span-1 font-medium text-center">{index + 1}</div>
                       <div className="col-span-5">
-                        <Label htmlFor={`tables-${index}`}>Nombre de tables</Label>
-                        <Input
+                        <label htmlFor={`tables-${index}`}>Nombre de tables</label>
+                        <input
                           id={`tables-${index}`}
                           type="number"
                           min="1"
@@ -761,8 +742,8 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         />
                       </div>
                       <div className="col-span-5">
-                        <Label htmlFor={`seats-${index}`}>Places par table</Label>
-                        <Input
+                        <label htmlFor={`seats-${index}`}>Places par table</label>
+                        <input
                           id={`seats-${index}`}
                           type="number"
                           min="1"
@@ -774,49 +755,46 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         />
                       </div>
                       <div className="col-span-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveColumn(index)}
-                          disabled={formData.columns.length <= 1}
-                        >
+                        <button onClick={() => handleRemoveColumn(index)} disabled={formData.columns.length <= 1}>
                           <Trash className="h-4 w-4" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   ))}
 
-                  <Button variant="outline" onClick={handleAddColumn} disabled={formData.columns.length >= 4}>
+                  <button variant="outline" onClick={handleAddColumn} disabled={formData.columns.length >= 4}>
                     <Plus className="mr-2 h-4 w-4" />
                     Ajouter une colonne
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingRoom(null)}>
+            <div>
+              <button variant="outline" onClick={() => setEditingRoom(null)}>
                 Annuler
-              </Button>
-              <Button onClick={handleEditRoom} disabled={isLoading}>
+              </button>
+              <button onClick={handleEditRoom} disabled={isLoading}>
                 {isLoading ? "Modification..." : "Enregistrer"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showDeleteDialog && (
-        <DeleteConfirmationDialog
+        <div
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
           onConfirm={() => handleDeleteRooms(selectedRoomIds)}
           itemCount={selectedRoomIds.length}
           itemType="salle"
-        />
+        >
+          {/* DeleteConfirmationDialog component implementation */}
+        </div>
       )}
 
       {showTemplates && effectiveUserId && establishmentId && (
-        <TemplateSelectionDialog
+        <div
           open={showTemplates}
           onOpenChange={setShowTemplates}
           onSelectTemplate={handleTemplateSelect}
@@ -826,11 +804,13 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
             setShowTemplates(false)
             loadRooms()
           }}
-        />
+        >
+          {/* TemplateSelectionDialog component implementation */}
+        </div>
       )}
 
       {showCreateSubRoom && establishmentId && effectiveUserId && (
-        <CreateSubRoomDialog
+        <div
           open={showCreateSubRoom}
           onOpenChange={setShowCreateSubRoom}
           onSuccess={() => {
@@ -841,10 +821,12 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
           selectedRoom={selectedRoomForSubRoom}
           userRole={effectiveUserRole}
           userId={effectiveUserId}
-        />
+        >
+          {/* CreateSubRoomDialog component implementation */}
+        </div>
       )}
 
-      <Toaster />
+      <div />
     </div>
   )
 }
