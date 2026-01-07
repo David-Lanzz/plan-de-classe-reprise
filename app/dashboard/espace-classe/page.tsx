@@ -1,39 +1,56 @@
-import { createClient } from "@/lib/supabase/server"
-import EspaceClasseManagement from "@/components/espace-classe-management"
+"use client"
 
-export default async function EspaceClassePage() {
-  const supabase = await createClient()
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/lib/use-auth"
+import { EspaceClasseManagement } from "@/components/espace-classe-management"
+import { useRouter } from "next/navigation"
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function EspaceClassePage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+  const [rooms, setRooms] = useState<any[]>([])
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true)
 
-  if (!user) {
-    return <div className="p-6">Session expirée. Veuillez vous reconnecter.</div>
+  useEffect(() => {
+    async function loadRooms() {
+      if (!user) return
+
+      const supabase = createClient()
+      const { data: roomsData } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("establishment_id", user.establishmentId)
+        .order("created_at", { ascending: false })
+
+      setRooms(roomsData || [])
+      setIsLoadingRooms(false)
+    }
+
+    if (user) {
+      loadRooms()
+    }
+  }, [user])
+
+  if (isLoading || isLoadingRooms) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    )
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*, establishment:establishments(*)")
-    .eq("id", user.id)
-    .single()
-
-  if (!profile || !profile.establishment_id) {
-    return <div className="p-6">Profil non trouvé</div>
-  }
-
-  const { data: rooms } = await supabase
-    .from("rooms")
-    .select("*")
-    .eq("establishment_id", profile.establishment_id)
-    .order("created_at", { ascending: false })
+  if (!user) return null
 
   return (
     <EspaceClasseManagement
-      initialRooms={rooms || []}
-      userRole={profile.role}
+      initialRooms={rooms}
+      userRole={user.role}
       userId={user.id}
-      establishmentId={profile.establishment_id}
+      establishmentId={user.establishmentId}
     />
   )
 }
