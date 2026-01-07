@@ -669,7 +669,6 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
 
         {/* Dialogs */}
         <div>
-          {console.log("[v0] Rendering CreateTemplateDialog...")}
           <CreateTemplateDialog
             open={showCreateTemplate}
             onOpenChange={setShowCreateTemplate}
@@ -680,9 +679,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
             userId={effectiveUserId}
             establishmentId={establishmentId}
           />
-          {console.log("[v0] CreateTemplateDialog rendered")}
 
-          {console.log("[v0] Rendering Edit Dialog...")}
           <Dialog open={editingRoom !== null} onOpenChange={(open) => !open && setEditingRoom(null)}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
@@ -799,9 +796,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          {console.log("[v0] Edit Dialog rendered")}
 
-          {console.log("[v0] Rendering DeleteConfirmationDialog...")}
           <DeleteConfirmationDialog
             open={selectedRoomIds.length > 0}
             onOpenChange={() => setSelectedRoomIds([])}
@@ -809,9 +804,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
             itemCount={selectedRoomIds.length}
             itemType="salle"
           />
-          {console.log("[v0] DeleteConfirmationDialog rendered")}
 
-          {console.log("[v0] Rendering TemplateSelectionDialog...")}
           <TemplateSelectionDialog
             open={showTemplates}
             onOpenChange={setShowTemplates}
@@ -823,9 +816,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
               loadRooms()
             }}
           />
-          {console.log("[v0] TemplateSelectionDialog rendered")}
 
-          {console.log("[v0] Rendering CreateSubRoomDialog...")}
           <CreateSubRoomDialog
             open={showCreateSubRoom}
             onOpenChange={setShowCreateSubRoom}
@@ -838,8 +829,6 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
             userRole={effectiveUserRole}
             userId={effectiveUserId} // Add missing userId prop
           />
-          {console.log("[v0] CreateSubRoomDialog rendered")}
-          {console.log("[v0] All Dialogs rendered successfully")}
         </div>
       </div>
 
