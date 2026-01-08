@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/lib/use-auth"
+import { CreateTemplateDialog } from "@/components/create-template-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { TemplateSelectionDialog } from "@/components/template-selection-dialog"
+import { CreateSubRoomDialog } from "@/components/create-sub-room-dialog"
 import {
   ArrowLeft,
   Plus,
@@ -126,7 +130,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
   }, [searchQuery, localRooms])
 
   const handleAddColumn = () => {
-    if (formData.columns.length >= 4) {
+    if (formData.columns.length >= 10) {
       return
     }
 
@@ -137,7 +141,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
   }
 
   const handleRemoveColumn = (index: number) => {
-    if (formData.columns.length <= 1) {
+    if (formData.columns.length === 1) {
       return
     }
 
@@ -658,7 +662,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
       </div>
 
       {showCreateTemplate && effectiveUserId && establishmentId && (
-        <div
+        <CreateTemplateDialog
           open={showCreateTemplate}
           onOpenChange={setShowCreateTemplate}
           onSuccess={() => {
@@ -667,23 +671,21 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
           }}
           userId={effectiveUserId}
           establishmentId={establishmentId}
-        >
-          {/* CreateTemplateDialog component implementation */}
-        </div>
+        />
       )}
 
       {editingRoom && (
-        <div open={true} onOpenChange={(open) => !open && setEditingRoom(null)}>
-          <div className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div>
-              <h2>Modifier la salle</h2>
-              <p>Modifiez la configuration de la salle de classe</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background max-w-3xl max-h-[90vh] overflow-y-auto rounded-lg shadow-lg p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Modifier la salle</h2>
+              <p className="text-sm text-muted-foreground">Modifiez la configuration de la salle de classe</p>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label htmlFor="name">Nom de la salle</label>
-                  <input
+                  <Label htmlFor="name">Nom de la salle</Label>
+                  <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -691,8 +693,8 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="code">Code de la salle</label>
-                  <input
+                  <Label htmlFor="code">Code de la salle</Label>
+                  <Input
                     id="code"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -702,8 +704,9 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="boardPosition">Position du tableau</label>
+                <Label htmlFor="boardPosition">Position du tableau</Label>
                 <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
                   value={formData.boardPosition}
                   onChange={(e) =>
                     setFormData({ ...formData, boardPosition: e.target.value as "top" | "bottom" | "left" | "right" })
@@ -731,8 +734,8 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                     <div key={index} className="grid grid-cols-12 gap-4 items-center p-2 border rounded-md">
                       <div className="col-span-1 font-medium text-center">{index + 1}</div>
                       <div className="col-span-5">
-                        <label htmlFor={`tables-${index}`}>Nombre de tables</label>
-                        <input
+                        <Label htmlFor={`tables-${index}`}>Nombre de tables</Label>
+                        <Input
                           id={`tables-${index}`}
                           type="number"
                           min="1"
@@ -742,12 +745,12 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         />
                       </div>
                       <div className="col-span-5">
-                        <label htmlFor={`seats-${index}`}>Places par table</label>
-                        <input
+                        <Label htmlFor={`seats-${index}`}>Places par table</Label>
+                        <Input
                           id={`seats-${index}`}
                           type="number"
                           min="1"
-                          max="7"
+                          max="10"
                           value={column.seatsPerTable}
                           onChange={(e) =>
                             handleColumnChange(index, "seatsPerTable", Number.parseInt(e.target.value) || 1)
@@ -755,78 +758,74 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                         />
                       </div>
                       <div className="col-span-1">
-                        <button onClick={() => handleRemoveColumn(index)} disabled={formData.columns.length <= 1}>
-                          <Trash className="h-4 w-4" />
-                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveColumn(index)}
+                          disabled={formData.columns.length === 1}
+                          className="text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
 
-                  <button variant="outline" onClick={handleAddColumn} disabled={formData.columns.length >= 4}>
-                    <Plus className="mr-2 h-4 w-4" />
+                  <Button
+                    onClick={handleAddColumn}
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    disabled={formData.columns.length >= 10}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
                     Ajouter une colonne
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </div>
-            <div>
-              <button variant="outline" onClick={() => setEditingRoom(null)}>
-                Annuler
-              </button>
-              <button onClick={handleEditRoom} disabled={isLoading}>
-                {isLoading ? "Modification..." : "Enregistrer"}
-              </button>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingRoom(null)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleEditRoom} disabled={isLoading}>
+                  {isLoading ? "Modification..." : "Enregistrer"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {showDeleteDialog && (
-        <div
+        <DeleteConfirmationDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
           onConfirm={() => handleDeleteRooms(selectedRoomIds)}
-          itemCount={selectedRoomIds.length}
-          itemType="salle"
-        >
-          {/* DeleteConfirmationDialog component implementation */}
-        </div>
+          title="Supprimer les salles"
+          description={`Êtes-vous sûr de vouloir supprimer ${selectedRoomIds.length} salle(s) ? Cette action est irréversible.`}
+        />
       )}
 
-      {showTemplates && effectiveUserId && establishmentId && (
-        <div
+      {showTemplates && (
+        <TemplateSelectionDialog
           open={showTemplates}
           onOpenChange={setShowTemplates}
           onSelectTemplate={handleTemplateSelect}
-          userId={effectiveUserId}
-          establishmentId={establishmentId}
-          onTemplateSelected={() => {
-            setShowTemplates(false)
-            loadRooms()
-          }}
-        >
-          {/* TemplateSelectionDialog component implementation */}
-        </div>
+        />
       )}
 
-      {showCreateSubRoom && establishmentId && effectiveUserId && (
-        <div
+      {showCreateSubRoom && selectedRoomForSubRoom && (
+        <CreateSubRoomDialog
           open={showCreateSubRoom}
           onOpenChange={setShowCreateSubRoom}
+          selectedRoom={selectedRoomForSubRoom}
           onSuccess={() => {
             setShowCreateSubRoom(false)
+            setSelectedRoomForSubRoom(null)
             loadRooms()
           }}
-          establishmentId={establishmentId}
-          selectedRoom={selectedRoomForSubRoom}
-          userRole={effectiveUserRole}
-          userId={effectiveUserId}
-        >
-          {/* CreateSubRoomDialog component implementation */}
-        </div>
+        />
       )}
-
-      <div />
     </div>
   )
 }
