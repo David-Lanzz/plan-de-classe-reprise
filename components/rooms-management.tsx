@@ -465,7 +465,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                 {isDelegate && (
                   <Button
                     onClick={() => setShowTemplates(true)}
-                    className="flex-1 h-16 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
+                    className="flex-1 h-16 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
                   >
                     <Grid3x3 className="mr-2 h-5 w-5" />
                     Voir les templates
@@ -600,7 +600,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
                 <Button
                   onClick={() => setShowTemplates(true)}
                   size="lg"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-700"
                 >
                   <Plus className="mr-2 h-5 w-5" />
                   Créer une salle
@@ -814,7 +814,7 @@ export function RoomsManagement({ rooms: initialRooms = [], establishmentId, use
         />
       )}
 
-      {showCreateSubRoom && selectedRoomForSubRoom && (
+      {showCreateSubRoom && (
         <CreateSubRoomDialog
           open={showCreateSubRoom}
           onOpenChange={setShowCreateSubRoom}
