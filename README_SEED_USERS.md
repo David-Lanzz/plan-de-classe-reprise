@@ -2,6 +2,9 @@
 
 ## 🎯 Objectif
 
+Version v0 du projet
+
+
 Ce script SQL crée automatiquement les utilisateurs de test pour deux établissements :
 - **ST-MARIE 14000** (code: stm001)
 - **VICTOR-HUGO 18760** (code: vh001)
